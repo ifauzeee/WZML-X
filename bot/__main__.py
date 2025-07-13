@@ -1,3 +1,4 @@
+# THIS IS THE FINAL AND CORRECTED __main__.py FILE
 from time import time, monotonic
 from datetime import datetime
 from sys import executable
@@ -58,6 +59,8 @@ from .helper.telegram_helper.filters import CustomFilters
 from .helper.telegram_helper.button_build import ButtonMaker
 from .helper.listeners.aria2_listener import start_aria2_listener
 from .helper.themes import BotTheme
+
+# Import modules and the new callback handler
 from .modules import (
     authorize,
     clone,
@@ -85,8 +88,8 @@ from .modules import (
     gen_pyro_sess,
     gd_clean,
     broadcast,
-    category_select,
 )
+from .modules.mirror_leech import mirror_leech_callback, wzmlxcb
 
 
 async def stats(client, message):
@@ -204,10 +207,10 @@ async def log(_, message):
 
 
 async def search_images():
-    if not (query_list := config_dict["IMG_SEARCH"]):
+    if not (query_list := config_dict.get("IMG_SEARCH")):
         return
     try:
-        total_pages = config_dict["IMG_PAGE"]
+        total_pages = config_dict.get("IMG_PAGE", 1)
         base_url = "https://www.wallpaperflare.com/search"
         for query in query_list:
             query = query.strip().replace(" ", "+")
@@ -323,56 +326,13 @@ async def restart_notification():
 
 
 async def log_check():
-    if config_dict["LEECH_LOG_ID"]:
-        for chat_id in config_dict["LEECH_LOG_ID"].split():
-            chat_id, *topic_id = chat_id.split(":")
+    if LEECH_LOG_ID := config_dict.get("LEECH_LOG_ID"):
+        for chat_id in LEECH_LOG_ID:
             try:
-                try:
-                    chat = await bot.get_chat(int(chat_id))
-                except Exception:
-                    LOGGER.error(
-                        f"Not Connected Chat ID : {chat_id}, Make sure the Bot is Added!"
-                    )
-                    continue
-                if chat.type == ChatType.CHANNEL:
-                    if not (
-                        await chat.get_member(bot.me.id)
-                    ).privileges.can_post_messages:
-                        LOGGER.error(
-                            f"Not Connected Chat ID : {chat_id}, Make the Bot is Admin in Channel to Connect!"
-                        )
-                        continue
-                    if (
-                        user
-                        and not (
-                            await chat.get_member(user.me.id)
-                        ).privileges.can_post_messages
-                    ):
-                        LOGGER.error(
-                            f"Not Connected Chat ID : {chat_id}, Make the User is Admin in Channel to Connect!"
-                        )
-                        continue
-                elif chat.type == ChatType.SUPERGROUP:
-                    if not (await chat.get_member(bot.me.id)).status in [
-                        ChatMemberStatus.OWNER,
-                        ChatMemberStatus.ADMINISTRATOR,
-                    ]:
-                        LOGGER.error(
-                            f"Not Connected Chat ID : {chat_id}, Make the Bot is Admin in Group to Connect!"
-                        )
-                        continue
-                    if user and not (await chat.get_member(user.me.id)).status in [
-                        ChatMemberStatus.OWNER,
-                        ChatMemberStatus.ADMINISTRATOR,
-                    ]:
-                        LOGGER.error(
-                            f"Not Connected Chat ID : {chat_id}, Make the User is Admin in Group to Connect!"
-                        )
-                        continue
-                LOGGER.info(f"Connected Chat ID : {chat_id}")
+                chat = await bot.get_chat(chat_id)
+                LOGGER.info(f"Successfully connected to Leech Log Chat ID: {chat_id}")
             except Exception as e:
-                LOGGER.error(f"Not Connected Chat ID : {chat_id}, ERROR: {e}")
-
+                LOGGER.error(f"Could not connect to Leech Log Chat ID: {chat_id}. ERROR: {e}")
 
 async def main():
     await gather(
@@ -385,47 +345,48 @@ async def main():
     )
     await sync_to_async(start_aria2_listener, wait=False)
 
-    bot.add_handler(
-        MessageHandler(start, filters=command(BotCommands.StartCommand) & private)
-    )
+    # Standard handlers
+    bot.add_handler(MessageHandler(start, filters=command(BotCommands.StartCommand) & private))
     bot.add_handler(CallbackQueryHandler(token_callback, filters=regex(r"^pass")))
-    bot.add_handler(
-        MessageHandler(login, filters=command(BotCommands.LoginCommand) & private)
-    )
-    bot.add_handler(
-        MessageHandler(
-            log, filters=command(BotCommands.LogCommand) & CustomFilters.sudo
-        )
-    )
-    bot.add_handler(
-        MessageHandler(
-            restart, filters=command(BotCommands.RestartCommand) & CustomFilters.sudo
-        )
-    )
-    bot.add_handler(
-        MessageHandler(
-            ping,
-            filters=command(BotCommands.PingCommand)
-            & CustomFilters.authorized
-            & ~CustomFilters.blacklisted,
-        )
-    )
-    bot.add_handler(
-        MessageHandler(
-            bot_help,
-            filters=command(BotCommands.HelpCommand)
-            & CustomFilters.authorized
-            & ~CustomFilters.blacklisted,
-        )
-    )
-    bot.add_handler(
-        MessageHandler(
-            stats,
-            filters=command(BotCommands.StatsCommand)
-            & CustomFilters.authorized
-            & ~CustomFilters.blacklisted,
-        )
-    )
+    bot.add_handler(MessageHandler(login, filters=command(BotCommands.LoginCommand) & private))
+    bot.add_handler(MessageHandler(log, filters=command(BotCommands.LogCommand) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(restart, filters=command(BotCommands.RestartCommand) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(ping, filters=command(BotCommands.PingCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(bot_help, filters=command(BotCommands.HelpCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(stats, filters=command(BotCommands.StatsCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+
+    # Custom category button handler
+    bot.add_handler(CallbackQueryHandler(mirror_leech_callback, filters=regex(r"cat_up")))
+
+    # Other callback from original file
+    bot.add_handler(CallbackQueryHandler(wzmlxcb, filters=regex(r"^wzmlx")))
+
+    # All command handlers from original file
+    bot.add_handler(MessageHandler(mirror_leech.mirror, filters=command(BotCommands.MirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(mirror_leech.qb_mirror, filters=command(BotCommands.QbMirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(ytdlp.ytdl, filters=command(BotCommands.YtdlCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(mirror_leech.leech, filters=command(BotCommands.LeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(mirror_leech.qb_leech, filters=command(BotCommands.QbLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(ytdlp.ytdl_leech, filters=command(BotCommands.YtdlLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(clone.clone, filters=command(BotCommands.CloneCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(gd_list.list_search, filters=command(BotCommands.ListCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(cancel_mirror.cancel_mirror, filters=command(BotCommands.CancelMirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(cancel_mirror.cancel_all, filters=command(BotCommands.CancelAllCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(status.mirror_status, filters=command(BotCommands.StatusCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(gd_delete.deletefile, filters=command(BotCommands.DeleteCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(gd_count.count, filters=command(BotCommands.CountCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(torrent_select.select_torrent, filters=command(BotCommands.BtSelectCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(torrent_search.torrent_search, filters=command(BotCommands.SearchCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(bot_settings.bot_settings, filters=command(BotCommands.BotSetCommand) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(users_settings.user_settings, filters=command(BotCommands.UserSetCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(shell.shell, filters=command(BotCommands.ShellCommand) & CustomFilters.owner_filter))
+    bot.add_handler(MessageHandler(eval.eval, filters=command(BotCommands.EvalCommand) & CustomFilters.owner_filter))
+    bot.add_handler(MessageHandler(speedtest.speedtest, filters=command(BotCommands.SpeedCommand) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(save_msg.save_message, filters=command(BotCommands.SaveMsgCommand) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(gen_pyro_sess.get_session, filters=command(BotCommands.GetSession) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(gd_clean.gdclean, filters=command(BotCommands.GdClean) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(broadcast.broadcast_message, filters=command(BotCommands.BroadcastCommand) & CustomFilters.sudo))
+
     LOGGER.info(f"WZML-X Bot [@{bot_name}] Started!")
     if user:
         LOGGER.info(f"WZ's User [@{user.me.username}] Ready!")
@@ -439,7 +400,6 @@ async def stop_signals():
         await bot.stop()
 
 
-bot_run = bot.loop.run_until_complete
-bot_run(main())
-bot_run(idle())
-bot_run(stop_signals())
+bot.loop.run_until_complete(main())
+bot.loop.run_until_complete(idle())
+bot.loop.run_until_complete(stop_signals())
