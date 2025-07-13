@@ -1,4 +1,4 @@
-# MODIFIED FOR CATEGORY SELECTION V3 (SYNTAX-SAFE & ROBUST LOGIC)
+# MODIFIED FOR CATEGORY SELECTION V4 (FINAL FIX)
 import asyncio
 import re
 import shlex
@@ -6,40 +6,24 @@ import time
 from asyncio import gather
 from pyrogram.errors import FloodWait, RPCError
 from pyrogram.types import Message
-from bot import (LOGGER, STOP_DUPLICATE, TORRENT_DIRECT_LIMIT,
-                 ZIP_UNZIP_LIMIT, LEECH_LIMIT, MEGA_LIMIT,
-                 GDRIVE_LIMIT, YTDLP_LIMIT, PLAYLIST_LIMIT,
-                 BUTTON_FOUR_NAME, BUTTON_FOUR_URL, BUTTON_FIVE_NAME,
-                 BUTTON_FIVE_URL, BUTTON_SIX_NAME, BUTTON_SIX_URL,
-                 VIEW_LINK, bot, user_data, config_dict)
-from bot.helper.ext_utils.bot_utils import (get_readable_time, is_magnet,
-                                            is_mega_link, is_gdrive_link,
-                                            is_gdtot_link, is_filepress_link,
-                                            is_udrive_link, is_sharer_link, is_sharedrive_link,
-                                            is_ytdl_link, get_content_type,
-                                            is_direct_link, is_rclone_path, is_url,
-                                            is_telegram_link, get_multi_links,
-                                            get_readable_file_size, is_share_link,
-                                            is_dood_link, is_streamwish_link, is_streamtape_link,
-                                            is_filehost_link)
+from bot import (LOGGER, STOP_DUPLICATE, TORRENT_LIMIT, DIRECT_LIMIT,
+                 LEECH_LIMIT, MEGA_LIMIT, GDRIVE_LIMIT, YTDLP_LIMIT,
+                 PLAYLIST_LIMIT, bot, user_data, config_dict)
+from bot.helper.ext_utils.bot_utils import (is_magnet, is_mega_link, is_gdrive_link, is_url,
+                                            is_rclone_path, is_telegram_link, get_tg_link_content)
 from bot.helper.ext_utils.exceptions import DirectDownloadLinkException
-from bot.helper.ext_utils.task_manager import task_manager
 from bot.helper.mirror_utils.download_utils.aria2_download import add_aria2c_download
 from bot.helper.mirror_utils.download_utils.gd_download import add_gd_download
 from bot.helper.mirror_utils.download_utils.qbit_download import add_qb_torrent
 from bot.helper.mirror_utils.download_utils.mega_download import add_mega_download
 from bot.helper.mirror_utils.download_utils.rclone_download import add_rclone_download
-from bot.helper.mirror_utils.download_utils.telegram_download import TelegramDownloadHelper
 from bot.helper.mirror_utils.download_utils.yt_dlp_download import add_yt_dlp_download
 from bot.helper.mirror_utils.gdrive_utlis.list import gdriveList
 from bot.helper.mirror_utils.rclone_utils.list import rcloneList
 from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.telegram_helper.filters import CustomFilters
-from bot.helper.telegram_helper.message_utils import (anno_checker, delete_links,
-                                                      edit_message, auto_delete_message,
-                                                      get_tg_link_content, send_message,
-                                                      delete_message, send_to_pm)
+from bot.helper.telegram_helper.message_utils import (anno_checker, delete_links, edit_message, send_message, delete_message)
 from bot.helper.listeners.tasks_listener import MirrorLeechListener
 from bot.helper.ext_utils.bulk_links import extract_bulk_links
 from bot.helper.ext_utils.misc import get_some_info, get_user_tasks
@@ -55,19 +39,18 @@ CUSTOM_DESTINATIONS = {
     'folder':    '1E9Ng9uMqJ2yAK8hqirp7EOImSGgKecW6',
 }
 
-# This is the new entry point for all mirror commands
+# New entry point for all mirror commands
 async def run_mirror_leech_entry(client, message: Message, is_leech=False, is_qbit=False, is_ytdlp=False, is_gdrive=False, is_rclone=False):
     if not hasattr(message, 'from_user') or not message.from_user:
         return
 
-    # Check for arguments that should bypass the category selection
     text_args = message.text.split()
     if any(arg in ['-s', '-select', '-up'] for arg in text_args):
         await original_mirror_leech_logic(client, message, is_leech, is_qbit, is_ytdlp, is_gdrive, is_rclone)
     else:
         await category_selection_logic(client, message, is_leech, is_qbit, is_ytdlp, is_gdrive, is_rclone)
 
-# This new function shows the category buttons
+# Shows the category buttons
 async def category_selection_logic(client, message: Message, is_leech=False, is_qbit=False, is_ytdlp=False, is_gdrive=False, is_rclone=False):
     is_bulk = 'bulk' in message.text.split(' ')[0].lower()
     
@@ -105,15 +88,18 @@ async def category_selection_logic(client, message: Message, is_leech=False, is_
 
     await send_message(message, msg, buttons.finalize(2))
 
-# This function handles the button presses
+# Handles the button presses
 async def mirror_leech_callback(client, callback_query):
     query = callback_query
     user_id = query.from_user.id
     message = query.message
     data = query.data.split("|")
 
-    if int(data[2]) != user_id and not await CustomFilters.sudo(client, query):
-        return await query.answer("Ini bukan pilihan untukmu!", show_alert=True)
+    try:
+        if int(data[2]) != user_id and not await CustomFilters.sudo(client, query):
+            return await query.answer("Ini bukan pilihan untukmu!", show_alert=True)
+    except IndexError:
+        return await query.answer("Callback error!", show_alert=True)
     
     if data[1] == "cancel":
         await query.answer()
@@ -156,13 +142,13 @@ def get_file_category(link, reply_to_message):
     if any(ext in link_lower for ext in ['.zip', '.rar', '.7z']): return 'folder'
     if any(ext in link_lower for ext in ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx']): return 'files'
     
-    return 'files' # Default category
+    return 'files'
 
 # This is the original logic of the bot, now callable as a function
 async def original_mirror_leech_logic(client, message, is_leech=False, is_qbit=False, is_ytdlp=False, is_gdrive=False, is_rclone=False, custom_upload_path=None):
     text = message.text.split('\n')
     input_list = text[0].split(' ')
-
+    
     tag = f"@{message.from_user.username}" if message.from_user.username else f"tg://user?id={message.from_user.id}"
     user_id = message.from_user.id
     
@@ -202,8 +188,8 @@ async def original_mirror_leech_logic(client, message, is_leech=False, is_qbit=F
     
     LOGGER.info(f"Link: {link}")
     
-    name = ""
     up_path = ""
+    name = ""
     
     args_list = message.text.split(maxsplit=1)
     if len(args_list) > 1:
@@ -219,7 +205,7 @@ async def original_mirror_leech_logic(client, message, is_leech=False, is_qbit=F
     if custom_upload_path:
         up_path = custom_upload_path
     
-    if up_path.startswith('mrcc:'):
+    if up_path and up_path.startswith('mrcc:'):
         is_rclone = True
     
     listener = MirrorLeechListener(message, is_leech=is_leech, is_qbit=is_qbit, is_ytdlp=is_ytdlp, is_gdrive=is_gdrive, is_rclone=is_rclone, tag=tag, is_bulk=is_bulk)
@@ -237,7 +223,7 @@ async def original_mirror_leech_logic(client, message, is_leech=False, is_qbit=F
     else:
         await add_aria2c_download(link, up_path, listener, name, tag)
     
-    if config_dict['DELETE_LINKS']:
+    if config_dict.get('DELETE_LINKS'):
         await delete_links(message)
 
 # Entry point functions that will be called by __main__.py
@@ -266,4 +252,4 @@ async def rclone(client, message: Message):
     await run_mirror_leech_entry(client, message, is_rclone=True)
 
 async def clone(client, message: Message):
-    await original_mirror_leech_logic(client, message, is_gdrive=True) # Clone uses original logic for simplicity
+    await original_mirror_leech_logic(client, message, is_gdrive=True)
