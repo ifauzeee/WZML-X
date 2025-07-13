@@ -2,7 +2,7 @@ from time import time, monotonic
 from datetime import datetime
 from sys import executable
 from os import execl as osexecl
-from asyncio import create_subprocess_exec, gather, run as asyrun
+from asyncio import create_subprocess_exec, gather
 from uuid import uuid4
 from base64 import b64decode
 from importlib import import_module, reload
@@ -58,6 +58,7 @@ from .helper.telegram_helper.filters import CustomFilters
 from .helper.telegram_helper.button_build import ButtonMaker
 from .helper.listeners.aria2_listener import start_aria2_listener
 from .helper.themes import BotTheme
+from .modules.mirror_leech import mirror_leech_callback
 from .modules import (
     authorize,
     clone,
@@ -85,7 +86,6 @@ from .modules import (
     gen_pyro_sess,
     gd_clean,
     broadcast,
-    category_select,
 )
 
 
@@ -426,6 +426,36 @@ async def main():
             & ~CustomFilters.blacklisted,
         )
     )
+    
+    # Menambahkan handler untuk tombol kategori
+    bot.add_handler(CallbackQueryHandler(mirror_leech_callback, filters=regex(r"cat_up")))
+
+    # Menambahkan handler untuk semua perintah mirror/leech
+    bot.add_handler(MessageHandler(mirror_leech.mirror, filters=command(BotCommands.MirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(mirror_leech.qb_mirror, filters=command(BotCommands.QbMirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(mirror_leech.ytdl, filters=command(BotCommands.YtdlCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(mirror_leech.leech, filters=command(BotCommands.LeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(mirror_leech.qb_leech, filters=command(BotCommands.QbLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(mirror_leech.ytdl_leech, filters=command(BotCommands.YtdlLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(mirror_leech.clone, filters=command(BotCommands.CloneCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(gd_list.list_search, filters=command(BotCommands.ListCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(cancel_mirror.cancel_mirror, filters=command(BotCommands.CancelMirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(cancel_mirror.cancel_all, filters=command(BotCommands.CancelAllCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(status.mirror_status, filters=command(BotCommands.StatusCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(gd_delete.deletefile, filters=command(BotCommands.DeleteCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(gd_count.count, filters=command(BotCommands.CountCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(torrent_select.select_torrent, filters=command(BotCommands.BtSelectCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(torrent_search.torrent_search, filters=command(BotCommands.SearchCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(bot_settings.bot_settings, filters=command(BotCommands.BotSetCommand) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(users_settings.user_settings, filters=command(BotCommands.UserSetCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(shell.shell, filters=command(BotCommands.ShellCommand) & CustomFilters.owner_filter))
+    bot.add_handler(MessageHandler(eval.eval, filters=command(BotCommands.EvalCommand) & CustomFilters.owner_filter))
+    bot.add_handler(MessageHandler(speedtest.speedtest, filters=command(BotCommands.SpeedCommand) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(save_msg.save_message, filters=command(BotCommands.SaveMsgCommand) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(gen_pyro_sess.get_session, filters=command(BotCommands.GetSession) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(gd_clean.gdclean, filters=command(BotCommands.GdClean) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(broadcast.broadcast_message, filters=command(BotCommands.BroadcastCommand) & CustomFilters.sudo))
+
     LOGGER.info(f"WZML-X Bot [@{bot_name}] Started!")
     if user:
         LOGGER.info(f"WZ's User [@{user.me.username}] Ready!")
@@ -439,7 +469,6 @@ async def stop_signals():
         await bot.stop()
 
 
-bot_run = bot.loop.run_until_complete
-bot_run(main())
-bot_run(idle())
-bot_run(stop_signals())
+bot.loop.run_until_complete(main())
+bot.loop.run_until_complete(idle())
+bot.loop.run_until_complete(stop_signals())
