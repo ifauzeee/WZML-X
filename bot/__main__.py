@@ -1,9 +1,9 @@
-# THIS IS THE FINAL AND CORRECTED __main__.py FILE
+# THIS IS THE FINAL AND CORRECTED __main__.py FILE BASED ON YOUR .BAK
 from time import time, monotonic
 from datetime import datetime
 from sys import executable
 from os import execl as osexecl
-from asyncio import create_subprocess_exec, gather, run as asyrun
+from asyncio import create_subprocess_exec, gather
 from uuid import uuid4
 from base64 import b64decode
 from importlib import import_module, reload
