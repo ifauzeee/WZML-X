@@ -1,3 +1,4 @@
+# MERGED AND CORRECTED CODE
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.filters import command, regex
 from html import escape
@@ -74,61 +75,36 @@ from bot.helper.ext_utils.bulk_links import extract_bulk_links
 from bot.modules.gen_pyro_sess import get_decrypt_key
 
 
+# --- CUSTOM FOLDER IDs ---
+CUSTOM_DESTINATIONS = {
+    'app':       '1tUCYi4x3l1_omXwspD2eiPlblBCJSgOV',
+    'video':     '1tKXmbfClZlpFi3NhXvM0aY2fJLk4Aw5R',
+    'audio':     '1M0eYHR0qg9OtzQUJT030b-x5fxt8DKAx',
+    'files':     '1gxPwlYhbKmzhYSk-ququFUzfBG5cj-lc',
+    'folder':    '1E9Ng9uMqJ2yAK8hqirp7EOImSGgKecW6',
+}
+
+
 @new_task
 async def _mirror_leech(
-    client, message, isQbit=False, isLeech=False, sameDir=None, bulk=[]
+    client, message, isQbit=False, isLeech=False, sameDir=None, bulk=[], custom_upload_path=None
 ):
     text = message.text.split("\n")
     input_list = text[0].split(" ")
 
     arg_base = {
-        "link": "",
-        "-i": "0",
-        "-m": "",
-        "-sd": "",
-        "-samedir": "",
-        "-d": False,
-        "-seed": False,
-        "-j": False,
-        "-join": False,
-        "-s": False,
-        "-select": False,
-        "-b": False,
-        "-bulk": False,
-        "-n": "",
-        "-name": "",
-        "-e": False,
-        "-extract": False,
-        "-uz": False,
-        "-unzip": False,
-        "-z": False,
-        "-zip": False,
-        "-up": "",
-        "-upload": "",
-        "-rcf": "",
-        "-u": "",
-        "-user": "",
-        "-p": "",
-        "-pass": "",
-        "-id": "",
-        "-index": "",
-        "-c": "",
-        "-category": "",
-        "-ud": "",
-        "-dump": "",
-        "-h": "",
-        "-headers": "",
-        "-ss": "0",
-        "-screenshots": "",
-        "-t": "",
-        "-thumb": "",
+        "link": "", "-i": "0", "-m": "", "-sd": "", "-samedir": "", "-d": False, "-seed": False,
+        "-j": False, "-join": False, "-s": False, "-select": False, "-b": False, "-bulk": False,
+        "-n": "", "-name": "", "-e": False, "-extract": False, "-uz": False, "-unzip": False,
+        "-z": False, "-zip": False, "-up": "", "-upload": "", "-rcf": "", "-u": "", "-user": "",
+        "-p": "", "-pass": "", "-id": "", "-index": "", "-c": "", "-category": "",
+        "-ud": "", "-dump": "", "-h": "", "-headers": "", "-ss": "0", "-screenshots": "",
+        "-t": "", "-thumb": "",
     }
 
     args = arg_parser(input_list[1:], arg_base)
     cmd = input_list[0].split("@")[0]
-
     multi = int(args["-i"]) if args["-i"].isdigit() else 0
-
     link = args["link"]
     folder_name = args["-m"] or args["-sd"] or args["-samedir"]
     seed = args["-d"] or args["-seed"]
@@ -136,17 +112,8 @@ async def _mirror_leech(
     select = args["-s"] or args["-select"]
     isBulk = args["-b"] or args["-bulk"]
     name = args["-n"] or args["-name"]
-    extract = (
-        args["-e"]
-        or args["-extract"]
-        or args["-uz"]
-        or args["-unzip"]
-        or "uz" in cmd
-        or "unzip" in cmd
-    )
-    compress = (
-        args["-z"] or args["-zip"] or (not extract and ("z" in cmd or "zip" in cmd))
-    )
+    extract = (args["-e"] or args["-extract"] or args["-uz"] or args["-unzip"] or "uz" in cmd or "unzip" in cmd)
+    compress = (args["-z"] or args["-zip"] or (not extract and ("z" in cmd or "zip" in cmd)))
     up = args["-up"] or args["-upload"]
     rcf = args["-rcf"]
     drive_id = args["-id"]
@@ -157,7 +124,8 @@ async def _mirror_leech(
     ussr = args["-u"] or args["-user"]
     pssw = args["-p"] or args["-pass"]
     thumb = args["-t"] or args["-thumb"]
-    sshots = int(ss) if (ss := (args["-ss"] or args["-screenshots"])).isdigit() else 0
+    sshots_arg = args["-ss"] or args["-screenshots"]
+    sshots = int(sshots_arg) if sshots_arg.isdigit() else 0
     bulk_start = 0
     bulk_end = 0
     ratio = None
@@ -166,6 +134,9 @@ async def _mirror_leech(
     file_ = None
     session = ""
 
+    if custom_upload_path:
+        up = custom_upload_path
+        
     if not isinstance(seed, bool):
         dargs = seed.split(":")
         ratio = dargs[0] or None
@@ -197,18 +168,13 @@ async def _mirror_leech(
             bulk = await extract_bulk_links(message, bulk_start, bulk_end)
             if len(bulk) == 0:
                 raise ValueError("Bulk Empty!")
-        except Exception:
-            await sendMessage(
-                message,
-                "Reply to text file or tg message that have links seperated by new line!",
-            )
+        except:
+            await sendMessage(message, "Reply to a text file or a tg message that has links separated by a new line!")
             return
         b_msg = input_list[:1]
         b_msg.append(f"{bulk[0]} -i {len(bulk)}")
         nextmsg = await sendMessage(message, " ".join(b_msg))
-        nextmsg = await client.get_messages(
-            chat_id=message.chat.id, message_ids=nextmsg.id
-        )
+        nextmsg = await client.get_messages(chat_id=message.chat.id, message_ids=nextmsg.id)
         nextmsg.from_user = message.from_user
         _mirror_leech(client, nextmsg, isQbit, isLeech, sameDir, bulk)
         return
@@ -229,13 +195,9 @@ async def _mirror_leech(
             msg = [s.strip() for s in input_list]
             index = msg.index("-i")
             msg[index + 1] = f"{multi - 1}"
-            nextmsg = await client.get_messages(
-                chat_id=message.chat.id, message_ids=message.reply_to_message_id + 1
-            )
+            nextmsg = await client.get_messages(chat_id=message.chat.id, message_ids=message.reply_to_message_id + 1)
             nextmsg = await sendMessage(nextmsg, " ".join(msg))
-        nextmsg = await client.get_messages(
-            chat_id=message.chat.id, message_ids=nextmsg.id
-        )
+        nextmsg = await client.get_messages(chat_id=message.chat.id, message_ids=nextmsg.id)
         if folder_name:
             sameDir["tasks"].add(nextmsg.id)
         nextmsg.from_user = message.from_user
@@ -245,41 +207,22 @@ async def _mirror_leech(
     __run_multi()
 
     path = f"{DOWNLOAD_DIR}{message.id}{folder_name}"
-
-    if len(text) > 1 and text[1].startswith("Tag: "):
-        tag, id_ = text[1].split("Tag: ")[1].split()
-        message.from_user = await client.get_users(id_)
-        try:
-            await message.unpin()
-        except Exception:
-            pass
-    elif sender_chat := message.sender_chat:
+    
+    sender_chat = message.sender_chat
+    if sender_chat:
         tag = sender_chat.title
-    if username := message.from_user.username:
-        tag = f"@{username}"
     else:
         tag = message.from_user.mention
-
-    decrypter = None
+    
     if not link and (reply_to := message.reply_to_message):
         if reply_to.text:
             link = reply_to.text.split("\n", 1)[0].strip()
+            
     if link and is_telegram_link(link):
         try:
-            reply_to, session = await get_tg_link_content(link, message.from_user.id)
-            if reply_to is None and session == "":
-                decrypter, is_cancelled = await wrap_future(
-                    get_decrypt_key(client, message)
-                )
-                if is_cancelled:
-                    return
-                reply_to, session = await get_tg_link_content(
-                    link, message.from_user.id, decrypter
-                )
+            reply_to, session = await get_tg_link_content(link)
         except Exception as e:
-            LOGGER.info(format_exc())
-            await sendMessage(message, f"<b>ERROR:</b> <i>{e}</i>")
-            await delete_links(message)
+            await sendMessage(message, f"ERROR: {e}")
             return
 
     if reply_to:
@@ -288,26 +231,12 @@ async def _mirror_leech(
             reply_text = reply_to.text.split("\n", 1)[0].strip()
             if is_url(reply_text) or is_magnet(reply_text):
                 link = reply_text
-        elif reply_to.document and (
-            file_.mime_type == "application/x-bittorrent"
-            or file_.file_name.endswith(".torrent")
-        ):
+        elif reply_to.document and (file_.mime_type == "application/x-bittorrent" or file_.file_name.endswith(".torrent")):
             link = await reply_to.download()
             file_ = None
 
-    if (
-        not is_url(link)
-        and not is_magnet(link)
-        and not await aiopath.exists(link)
-        and not is_rclone_path(link)
-        and file_ is None
-    ):
-        btn = ButtonMaker()
-        btn.ibutton(
-            "Cʟɪᴄᴋ Hᴇʀᴇ Tᴏ Rᴇᴀᴅ Mᴏʀᴇ ...", f"wzmlx {message.from_user.id} help MIRROR"
-        )
-        await sendMessage(message, MIRROR_HELP_MESSAGE[0], btn.build_menu(1))
-        await delete_links(message)
+    if (not is_url(link) and not is_magnet(link) and not await aiopath.exists(link) and not is_rclone_path(link) and file_ is None):
+        await sendMessage(message, MIRROR_HELP_MESSAGE[0])
         return
 
     error_msg = []
@@ -317,214 +246,173 @@ async def _mirror_leech(
         error_msg.extend(task_utilis_msg)
 
     if error_msg:
-        final_msg = f"<b><i>User:</i> {tag}</b>,\n"
+        final_msg = f"Hey {tag},\n"
         for __i, __msg in enumerate(error_msg, 1):
             final_msg += f"\n<b>{__i}</b>: {__msg}\n"
         if error_button is not None:
             error_button = error_button.build_menu(2)
         await sendMessage(message, final_msg, error_button)
-        await delete_links(message)
         return
 
-    org_link = None
+    org_link = link
     if link:
         LOGGER.info(link)
-        org_link = link
-
-    if (
-        (
-            not is_mega_link(link)
-            or (
-                is_mega_link(link)
-                and not config_dict["MEGA_EMAIL"]
-                and config_dict["DEBRID_LINK_API"]
-            )
-        )
-        and (
-            not is_magnet(link) or (config_dict["REAL_DEBRID_API"] and is_magnet(link))
-        )
-        and (not isQbit or (config_dict["REAL_DEBRID_API"] and is_magnet(link)))
-        and not is_rclone_path(link)
-        and not is_gdrive_link(link)
-        and not link.endswith(".torrent")
-        and file_ is None
-    ):
-        content_type = await get_content_type(link)
-        if content_type is None or re_match(r"text/html|text/plain", content_type):
-            process_msg = await sendMessage(
-                message, f"<i><b>Processing:</b></i> <code>{link}</code>"
-            )
-            try:
-                if not is_magnet(link) and (ussr or pssw):
-                    link = (link, (ussr, pssw))
-                link = await sync_to_async(direct_link_generator, link)
-                if isinstance(link, tuple):
-                    link, headers = link
-                elif isinstance(link, str):
-                    LOGGER.info(f"Generated link: {link}")
-                    await editMessage(
-                        process_msg,
-                        f"<i><b>Generated link:</b></i> <code>{link}</code>",
-                    )
-            except DirectDownloadLinkException as e:
-                e = str(e)
-                if "This link requires a password!" not in e:
-                    LOGGER.info(e)
-                if str(e).startswith("ERROR:"):
-                    await editMessage(process_msg, str(e))
-                    await delete_links(message)
-                    return
-            await deleteMessage(process_msg)
 
     if not isLeech:
         if config_dict["DEFAULT_UPLOAD"] == "rc" and not up or up == "rc":
-            up = config_dict["RCLONE_PATH"]
-        elif config_dict["DEFAULT_UPLOAD"] == "ddl" and not up or up == "ddl":
-            up = "ddl"
+            up = config_dict.get("RCLONE_PATH")
         if not up and config_dict["DEFAULT_UPLOAD"] == "gd":
             up = "gd"
-            user_tds = await fetch_user_tds(message.from_user.id)
-            if not drive_id and gd_cat:
-                merged_dict = {**categories_dict, **user_tds}
-                drive_id, index_link = next(
-                    (
-                        (drive_dict["drive_id"], drive_dict["index_link"])
-                        for drive_name, drive_dict in merged_dict.items()
-                        if drive_name.casefold() == gd_cat.replace("_", " ").casefold()
-                    ),
-                    ("", ""),
-                )
-            if not drive_id and len(user_tds) == 1:
-                drive_id, index_link = next(iter(user_tds.values())).values()
-            elif not drive_id and (
-                len(categories_dict) > 1
-                and len(user_tds) == 0
-                or len(categories_dict) >= 1
-                and len(user_tds) > 1
-            ):
-                drive_id, index_link, is_cancelled = await open_category_btns(message)
-                if is_cancelled:
-                    await delete_links(message)
-                    return
-            if drive_id and not await sync_to_async(
-                GoogleDriveHelper().getFolderData, drive_id
-            ):
+            if not drive_id:
+                drive_id, index_link = await open_category_btns(message)
+            if drive_id and not await sync_to_async(GoogleDriveHelper().getFolderData, drive_id):
                 return await sendMessage(message, "Google Drive ID validation failed!!")
-        if up == "gd" and not config_dict["GDRIVE_ID"] and not drive_id:
+        if up == "gd" and not config_dict.get("GDRIVE_ID") and not drive_id:
             await sendMessage(message, "GDRIVE_ID not Provided!")
             return
         elif not up:
             await sendMessage(message, "No RClone Destination!")
-            await delete_links(message)
             return
-        elif up not in ["rcl", "gd", "ddl"]:
-            if up.startswith("mrcc:"):
-                config_path = f"rclone/{message.from_user.id}.conf"
-            else:
-                config_path = "rclone.conf"
-            if not await aiopath.exists(config_path):
-                await sendMessage(message, f"RClone Config: {config_path} not Exists!")
-                await delete_links(message)
-                return
-        if up != "gd" and up != "ddl" and not is_rclone_path(up):
+        elif up != 'gd' and not is_rclone_path(up):
             await sendMessage(message, "Wrong Rclone Upload Destination!")
-            await delete_links(message)
             return
     else:
-        if user_dump and (user_dump.isdigit() or user_dump.startswith("-")):
-            up = int(user_dump)
-        elif user_dump and user_dump.startswith("@"):
-            up = user_dump
-        elif ldumps := await fetch_user_dumps(message.from_user.id):
-            if user_dump and user_dump.casefold() == "all":
-                up = [dump_id for dump_id in ldumps.values()]
-            elif user_dump:
-                up = next(
-                    (
-                        dump_id
-                        for name_, dump_id in ldumps.items()
-                        if user_dump.casefold() == name_.casefold()
-                    ),
-                    "",
-                )
-            if not up and len(ldumps) == 1:
-                up = next(iter(ldumps.values()))
-            elif not up:
-                up, is_cancelled = await open_dump_btns(message)
-                if is_cancelled:
-                    await delete_links(message)
-                    return
+        up = 'leech'
 
-    if link == "rcl":
-        link = await RcloneList(client, message).get_rclone_path("rcd")
-        if not is_rclone_path(link):
-            await sendMessage(message, link)
-            await delete_links(message)
-            return
 
-    if up == "rcl" and not isLeech:
-        up = await RcloneList(client, message).get_rclone_path("rcu")
-        if not is_rclone_path(up):
-            await sendMessage(message, up)
-            await delete_links(message)
-            return
-
-    listener = MirrorLeechListener(
-        message,
-        compress,
-        extract,
-        isQbit,
-        isLeech,
-        tag,
-        select,
-        seed,
-        sameDir,
-        rcf,
-        up,
-        join,
-        drive_id=drive_id,
-        index_link=index_link,
-        source_url=org_link or link,
-        leech_utils={"screenshots": sshots, "thumb": thumb},
-    )
+    listener = MirrorLeechListener(message, compress, extract, isQbit, isLeech, tag, select, seed, sameDir, rcf, up, join, drive_id=drive_id, index_link=index_link, source_url=org_link, leech_utils={"screenshots": sshots, "thumb": thumb})
 
     if file_ is not None:
-        await delete_links(message)
-        await TelegramDownloadHelper(listener).add_download(
-            reply_to, f"{path}/", name, session, decrypter
-        )
-    elif isinstance(link, dict):
-        await add_direct_download(link, path, listener, name)
+        await TelegramDownloadHelper(listener).add_download(reply_to, f"{path}/", name)
     elif is_rclone_path(link):
-        if link.startswith("mrcc:"):
-            link = link.split("mrcc:", 1)[1]
-            config_path = f"rclone/{message.from_user.id}.conf"
-        else:
-            config_path = "rclone.conf"
-        if not await aiopath.exists(config_path):
-            await sendMessage(
-                message, f"<b>RClone Config:</b> {config_path} not Exists!"
-            )
-            await delete_links(message)
-            return
-        await add_rclone_download(link, config_path, f"{path}/", name, listener)
+        await add_rclone_download(link, config_dict.get("RCLONE_CONFIG"), f"{path}/", name, listener)
     elif is_gdrive_link(link):
-        await delete_links(message)
-        await add_gd_download(link, path, listener, name, org_link)
+        await add_gd_download(link, path, listener, name)
     elif is_mega_link(link):
-        await delete_links(message)
         await add_mega_download(link, f"{path}/", listener, name)
-    elif isQbit and "real-debrid" not in link:
+    elif isQbit:
         await add_qb_torrent(link, path, listener, ratio, seed_time)
-    elif not is_telegram_link(link):
+    else:
+        headers = ""
         if ussr or pssw:
             auth = f"{ussr}:{pssw}"
-            headers += (
-                f" authorization: Basic {b64encode(auth.encode()).decode('ascii')}"
-            )
+            headers = f"authorization: Basic {b64encode(auth.encode()).decode('ascii')}"
         await add_aria2c_download(link, path, listener, name, headers, ratio, seed_time)
-    await delete_links(message)
 
+# --- START OF CUSTOM CATEGORY LOGIC ---
+
+def get_file_category(link, reply_to_message):
+    media = reply_to_message
+    if media:
+        if media.video: return 'video'
+        if media.audio or media.voice: return 'audio'
+        if media.document:
+            mime_type = media.document.mime_type or ""
+            file_name = media.document.file_name or ""
+            if mime_type == 'application/vnd.android.package-archive' or file_name.lower().endswith('.apk'):
+                return 'app'
+            if 'zip' in mime_type or 'rar' in mime_type or file_name.lower().endswith('.7z'):
+                return 'folder'
+            if any(x in mime_type for x in ['pdf', 'word', 'powerpoint', 'excel']):
+                return 'files'
+    
+    link_lower = link.lower()
+    if is_magnet(link_lower): return 'folder'
+    if '.apk' in link_lower: return 'app'
+    if any(ext in link_lower for ext in ['.mp4', '.mkv', '.webm', '.flv', '.mov']): return 'video'
+    if any(ext in link_lower for ext in ['.mp3', '.flac', '.wav', '.m4a']): return 'audio'
+    if any(ext in link_lower for ext in ['.zip', '.rar', '.7z']): return 'folder'
+    if any(ext in link_lower for ext in ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx']): return 'files'
+    
+    return 'files'
+
+async def category_selection_logic(client, message: Message, isQbit=False, isLeech=False):
+    isBulk = 'bulk' in message.text.split(' ')[0].lower()
+    
+    link = ""
+    reply_to = message.reply_to_message
+    if reply_to:
+        if reply_to.text:
+            link = reply_to.text.strip()
+        elif reply_to.media:
+            link = await get_tg_link_content(reply_to)
+    
+    if not link:
+        command_parts = message.text.split(' ', 1)
+        if len(command_parts) > 1:
+            link = command_parts[1].strip()
+
+    if not link:
+        return await sendMessage(message, "Tidak ada link/file yang valid untuk di-mirror.")
+
+    category = get_file_category(link, reply_to)
+    user_id = message.from_user.id
+    buttons = ButtonMaker()
+    
+    msg = f"<b>Tipe file terdeteksi:</b> <code>{category.upper()}</code>\n"
+    msg += "Pilih folder tujuan untuk melanjutkan mirror:"
+
+    flags = f"{isQbit}|{isLeech}|{isBulk}|{message.id}"
+
+    buttons.cb_buildbutton("🎬 Video", f"cat_up|video|{user_id}|{flags}")
+    buttons.cb_buildbutton("🎵 Audio", f"cat_up|audio|{user_id}|{flags}")
+    buttons.cb_buildbutton("📦 Aplikasi", f"cat_up|app|{user_id}|{flags}")
+    buttons.cb_buildbutton("📄 Dokumen", f"cat_up|files|{user_id}|{flags}")
+    buttons.cb_buildbutton("🗂️ Arsip (ZIP/RAR)", f"cat_up|folder|{user_id}|{flags}")
+    buttons.cb_buildbutton("❌ Batal", f"cat_up|cancel|{user_id}|{flags}")
+
+    await sendMessage(message, msg, buttons.finalize(2))
+
+async def mirror_leech_callback(client, callback_query):
+    query = callback_query
+    user_id = query.from_user.id
+    message = query.message
+    data = query.data.split("|")
+
+    try:
+        if int(data[2]) != user_id and not await CustomFilters.sudo(client, query):
+            return await query.answer("Ini bukan pilihan untukmu!", show_alert=True)
+    except IndexError:
+        return await query.answer("Callback error!", show_alert=True)
+    
+    if data[1] == "cancel":
+        await query.answer()
+        return await deleteMessage(message)
+
+    await query.answer()
+    category_key = data[1]
+    up_path = CUSTOM_DESTINATIONS.get(category_key)
+    
+    if not up_path:
+        return await editMessage(message, "Kategori tidak valid!")
+
+    try:
+        flags_data = data[3:]
+        isQbit = flags_data[0] == 'True'
+        isLeech = flags_data[1] == 'True'
+        isBulk = flags_data[2] == 'True'
+        original_msg_id = int(flags_data[3])
+    except (ValueError, IndexError):
+        return await editMessage(message, "Error: Callback data tidak lengkap. Harap mulai lagi.")
+    
+    try:
+        original_message = await client.get_messages(chat_id=message.chat.id, message_ids=original_msg_id)
+    except Exception as e:
+        LOGGER.error(f"Could not get original message: {e}")
+        return await editMessage(message, "Error: Tidak dapat menemukan pesan asli. Harap mulai lagi.")
+
+    await editMessage(message, f"✅ Oke! File akan di-mirror ke folder **{category_key.upper()}**.")
+    await _mirror_leech(client, original_message, isQbit=isQbit, isLeech=isLeech, custom_upload_path=up_path)
+
+
+async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech=False):
+    text_args = message.text.split()
+    if any(arg in ['-s', '-select', '-up', '-samedir', '-sd', '-m'] for arg in text_args):
+        await _mirror_leech(client, message, isQbit, isLeech)
+    else:
+        await category_selection_logic(client, message, isQbit, isLeech)
+
+# --- END OF CUSTOM CATEGORY LOGIC ---
 
 @new_task
 async def wzmlxcb(_, query):
@@ -537,13 +425,11 @@ async def wzmlxcb(_, query):
         await query.answer()
         async with aiopen("log.txt", "r") as f:
             logFileLines = (await f.read()).splitlines()
-
         def parseline(line):
             try:
                 return "[" + line.split("] [", 1)[1]
             except IndexError:
                 return line
-
         ind, Loglines = 1, ""
         try:
             while len(Loglines) <= 3500:
@@ -637,19 +523,19 @@ async def wzmlxcb(_, query):
 
 
 async def mirror(client, message):
-    _mirror_leech(client, message)
+    await run_mirror_leech_entry(client, message)
 
 
 async def qb_mirror(client, message):
-    _mirror_leech(client, message, isQbit=True)
+    await run_mirror_leech_entry(client, message, isQbit=True)
 
 
 async def leech(client, message):
-    _mirror_leech(client, message, isLeech=True)
+    await run_mirror_leech_entry(client, message, isLeech=True)
 
 
 async def qb_leech(client, message):
-    _mirror_leech(client, message, isQbit=True, isLeech=True)
+    await run_mirror_leech_entry(client, message, isQbit=True, isLeech=True)
 
 
 bot.add_handler(
