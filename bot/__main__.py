@@ -59,8 +59,6 @@ from .helper.telegram_helper.filters import CustomFilters
 from .helper.telegram_helper.button_build import ButtonMaker
 from .helper.listeners.aria2_listener import start_aria2_listener
 from .helper.themes import BotTheme
-
-# Import modules and the new callback handler
 from .modules import (
     authorize,
     clone,
@@ -89,6 +87,7 @@ from .modules import (
     gd_clean,
     broadcast,
 )
+# We need to import the new callback handlers from our modified module
 from .modules.mirror_leech import mirror_leech_callback, wzmlxcb
 
 
@@ -327,9 +326,9 @@ async def restart_notification():
 
 async def log_check():
     if LEECH_LOG_ID := config_dict.get("LEECH_LOG_ID"):
-        for chat_id in LEECH_LOG_ID:
+        for chat_id in LEECH_LOG_ID.split():
             try:
-                chat = await bot.get_chat(chat_id)
+                chat = await bot.get_chat(int(chat_id))
                 LOGGER.info(f"Successfully connected to Leech Log Chat ID: {chat_id}")
             except Exception as e:
                 LOGGER.error(f"Could not connect to Leech Log Chat ID: {chat_id}. ERROR: {e}")
@@ -354,14 +353,14 @@ async def main():
     bot.add_handler(MessageHandler(ping, filters=command(BotCommands.PingCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(bot_help, filters=command(BotCommands.HelpCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(stats, filters=command(BotCommands.StatsCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-
+    
     # Custom category button handler
     bot.add_handler(CallbackQueryHandler(mirror_leech_callback, filters=regex(r"cat_up")))
-
+    
     # Other callback from original file
     bot.add_handler(CallbackQueryHandler(wzmlxcb, filters=regex(r"^wzmlx")))
 
-    # All command handlers from original file
+    # All command handlers
     bot.add_handler(MessageHandler(mirror_leech.mirror, filters=command(BotCommands.MirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(mirror_leech.qb_mirror, filters=command(BotCommands.QbMirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(ytdlp.ytdl, filters=command(BotCommands.YtdlCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
@@ -386,7 +385,7 @@ async def main():
     bot.add_handler(MessageHandler(gen_pyro_sess.get_session, filters=command(BotCommands.GetSession) & CustomFilters.sudo))
     bot.add_handler(MessageHandler(gd_clean.gdclean, filters=command(BotCommands.GdClean) & CustomFilters.sudo))
     bot.add_handler(MessageHandler(broadcast.broadcast_message, filters=command(BotCommands.BroadcastCommand) & CustomFilters.sudo))
-
+    
     LOGGER.info(f"WZML-X Bot [@{bot_name}] Started!")
     if user:
         LOGGER.info(f"WZ's User [@{user.me.username}] Ready!")
