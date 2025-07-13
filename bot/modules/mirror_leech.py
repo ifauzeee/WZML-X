@@ -1,4 +1,4 @@
-# MODIFIED FOR CATEGORY SELECTION V4 (FINAL FIX)
+# MODIFIED FOR CATEGORY SELECTION V5 (FINAL IMPORT FIX)
 import asyncio
 import re
 import shlex
@@ -10,7 +10,7 @@ from bot import (LOGGER, STOP_DUPLICATE, TORRENT_LIMIT, DIRECT_LIMIT,
                  LEECH_LIMIT, MEGA_LIMIT, GDRIVE_LIMIT, YTDLP_LIMIT,
                  PLAYLIST_LIMIT, bot, user_data, config_dict)
 from bot.helper.ext_utils.bot_utils import (is_magnet, is_mega_link, is_gdrive_link, is_url,
-                                            is_rclone_path, is_telegram_link, get_tg_link_content)
+                                            is_rclone_path, is_telegram_link)
 from bot.helper.ext_utils.exceptions import DirectDownloadLinkException
 from bot.helper.mirror_utils.download_utils.aria2_download import add_aria2c_download
 from bot.helper.mirror_utils.download_utils.gd_download import add_gd_download
@@ -23,7 +23,7 @@ from bot.helper.mirror_utils.rclone_utils.list import rcloneList
 from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.telegram_helper.filters import CustomFilters
-from bot.helper.telegram_helper.message_utils import (anno_checker, delete_links, edit_message, send_message, delete_message)
+from bot.helper.telegram_helper.message_utils import (anno_checker, delete_links, edit_message, send_message, delete_message, get_tg_link_content)
 from bot.helper.listeners.tasks_listener import MirrorLeechListener
 from bot.helper.ext_utils.bulk_links import extract_bulk_links
 from bot.helper.ext_utils.misc import get_some_info, get_user_tasks
