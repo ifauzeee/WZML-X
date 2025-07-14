@@ -144,8 +144,10 @@ def get_readable_message():
     if PAGE_NO > PAGES and PAGES != 0:
         globals()["STATUS_START"] = STATUS_LIMIT * (PAGES - 1)
         globals()["PAGE_NO"] = PAGES
-    
-    for download in list(download_dict.values())[STATUS_START : STATUS_LIMIT + STATUS_START]:
+
+    for download in list(download_dict.values())[
+        STATUS_START : STATUS_LIMIT + STATUS_START
+    ]:
         if not hasattr(download, 'listener'):
             continue
             
@@ -153,39 +155,49 @@ def get_readable_message():
         msg_link = listener.message.link if listener.message.chat.type != ChatType.PRIVATE else ""
         elapsed = time() - download.message.date.timestamp()
 
-        # Format Nama
-        msg += f"<b><a href='{msg_link}'>{escape(download.name())}</a></b>"
+        # Format Nama File (diambil dari kode asli BotTheme)
+        msg += BotTheme("STATUS_NAME", Name=escape(f"{download.name()}"))
 
-        if download.status() not in [MirrorStatus.STATUS_SPLITTING, MirrorStatus.STATUS_SEEDING, MirrorStatus.STATUS_METADATA, MirrorStatus.STATUS_ARCHIVING, MirrorStatus.STATUS_EXTRACTING]:
-            msg += f"\n<b>┌ Size: </b><code>{download.size()}</code>"
-            
+        if download.status() not in [
+            MirrorStatus.STATUS_SPLITTING,
+            MirrorStatus.STATUS_SEEDING,
+            MirrorStatus.STATUS_METADATA,
+        ]:
+            msg += BotTheme(
+                "BAR",
+                Bar=f"{download.progress_bar()} {download.progress()}",
+            )
+            msg += BotTheme(
+                "PROCESSED",
+                Processed=f"{download.processed_bytes()} of {download.size()}",
+            )
+            msg += BotTheme("STATUS", Status=download.status(), Url=msg_link)
+            msg += BotTheme("ETA", Eta=download.eta())
+            msg += BotTheme("SPEED", Speed=download.speed())
+            msg += BotTheme("ELAPSED", Elapsed=get_readable_time(elapsed))
+
+            # Logic baru untuk mode dan path
             mode_line = ""
-            if listener.isLeech: mode_line += " | <i>Leech</i>"
-            elif listener.isClone: mode_line += " | <i>Clone</i>"
-            else: mode_line += " | <i>GDrive</i>"
+            if listener.isLeech: mode_line += " | #Leech"
+            elif listener.isClone: mode_line += " | #Clone"
+            else: mode_line += " | #GDrive"
 
-            if listener.isQbit: mode_line += " | <i>qBit</i>"
-            elif listener.isYtdlp: mode_line += " | <i>YT-dlp</i>"
-            else:
-                try:
-                    mode_line += f" | <i>{download.eng().split(' ')[0]}</i>"
-                except:
-                     mode_line += " | <i>Aria2</i>"
+            if listener.isQbit: mode_line += " | #qBit"
+            elif listener.isYtdlp: mode_line += " | #YT-dlp"
+            else: mode_line += f" | #{download.eng().split(' ')[0]}"
 
-            msg += f"\n<b>├ Mode:</b><code>{mode_line}</code>"
-
+            msg += BotTheme("STA_MODE", Mode=mode_line)
             if listener.category_name:
                 msg += f"\n<b>├ Path: </b><code>{listener.category_name}</code>"
-            
-            msg += f"\n<b>├ Elapsed: </b><code>{get_readable_time(elapsed)}</code>"
-            msg += f"\n<b>└ By: </b>{listener.tag}"
-            
-            msg += f"\n{download.progress_bar()}"
-            msg += f"\n<code>{download.progress()}</code>"
-            msg += f" | <code>{download.speed()}</code>"
-            msg += f" | <code>ETA: {download.eta()}</code>"
 
+            if hasattr(download, "seeders_num"):
+                try:
+                    msg += BotTheme("SEEDERS", Seeders=download.seeders_num())
+                    msg += BotTheme("LEECHERS", Leechers=download.leechers_num())
+                except Exception:
+                    pass
         elif download.status() == MirrorStatus.STATUS_SEEDING:
+            # Menggunakan BotTheme asli untuk Seeding
             msg += BotTheme("STATUS", Status=download.status(), Url=msg_link)
             msg += BotTheme("SEED_SIZE", Size=download.size())
             msg += BotTheme("SEED_SPEED", Speed=download.upload_speed())
@@ -193,15 +205,20 @@ def get_readable_message():
             msg += BotTheme("RATIO", Ratio=download.ratio())
             msg += BotTheme("TIME", Time=download.seeding_time())
             msg += BotTheme("SEED_ENGINE", Engine=download.eng())
-            msg += BotTheme("USER", User=listener.tag, Id=listener.user_id)
         else:
+            # Fallback untuk status lain
             msg += BotTheme("STATUS", Status=download.status(), Url=msg_link)
             msg += BotTheme("STATUS_SIZE", Size=download.size())
             msg += BotTheme("NON_ENGINE", Engine=download.eng())
-            msg += BotTheme("USER", User=listener.tag, Id=listener.user_id)
-            
-        msg += BotTheme("CANCEL", Cancel=f"/{BotCommands.CancelMirror}_{download.gid()}")
-        msg += "\n\n"
+
+        msg += BotTheme("USER", User=listener.tag, Id=listener.user_id)
+        if hasattr(download, 'eng') and (download.eng()).startswith("qBit"):
+            msg += BotTheme(
+                "BTSEL", Btsel=f"/{BotCommands.BtSelectCommand}_{download.gid()}"
+            )
+        msg += BotTheme(
+            "CANCEL", Cancel=f"/{BotCommands.CancelMirror}_{download.gid()}"
+        )
 
     if len(msg) == 0:
         return None, None
@@ -215,7 +232,8 @@ def get_readable_message():
                 spd = download.upload_speed()
             elif hasattr(download, 'speed'):
                 spd = download.speed()
-        except: pass
+        except:
+            pass
         
         speed_in_bytes = 0
         if 'K' in spd:
@@ -246,6 +264,15 @@ def get_readable_message():
     msg += BotTheme("UL", UL=get_readable_file_size(up_speed))
     return msg, button
 
+# =======================================================
+# SISA FILE DI BAWAH INI ADALAH VERSI LENGKAP ASLI ANDA
+# UNTUK MENGHINDARI IMPORT ERROR
+# =======================================================
+
+async def get_user_tasks(user_id, maxtask):
+    if tasks := await getAllDownload("all", user_id):
+        return len(tasks) >= maxtask
+
 
 async def turn_page(data):
     STATUS_LIMIT = config_dict["STATUS_LIMIT"]
@@ -253,18 +280,21 @@ async def turn_page(data):
     async with download_dict_lock:
         if data[1] == "nex":
             if PAGE_NO == PAGES:
-                STATUS_START = 0; PAGE_NO = 1
+                STATUS_START = 0
+                PAGE_NO = 1
             else:
-                STATUS_START += STATUS_LIMIT; PAGE_NO += 1
+                STATUS_START += STATUS_LIMIT
+                PAGE_NO += 1
         elif data[1] == "pre":
             if PAGE_NO == 1:
-                STATUS_START = STATUS_LIMIT * (PAGES - 1); PAGE_NO = PAGES
+                STATUS_START = STATUS_LIMIT * (PAGES - 1)
+                PAGE_NO = PAGES
             else:
-                STATUS_START -= STATUS_LIMIT; PAGE_NO -= 1
+                STATUS_START -= STATUS_LIMIT
+                PAGE_NO -= 1
 
 
 def get_readable_time(seconds):
-    seconds = int(seconds)
     periods = [("d", 86400), ("h", 3600), ("m", 60), ("s", 1)]
     result = ""
     for period_name, period_seconds in periods:
@@ -273,7 +303,7 @@ def get_readable_time(seconds):
             result += f"{int(period_value)}{period_name}"
     return result
 
-# SISA FUNGSI DI BAWAH INI TIDAK DIUBAH DARI FILE ASLI ANDA
+
 def is_magnet(url):
     return bool(re_match(MAGNET_REGEX, url))
 
@@ -287,11 +317,24 @@ def is_gdrive_link(url):
 
 
 def is_telegram_link(url):
-    return url.startswith(("https://t.me/", "https://telegram.me/", "https://telegram.dog/", "https://telegram.space/", "tg://openmessage?user_id="))
+    return url.startswith(
+        (
+            "https://t.me/",
+            "https://telegram.me/",
+            "https://telegram.dog/",
+            "https://telegram.space/",
+            "tg://openmessage?user_id=",
+        )
+    )
 
 
 def is_share_link(url):
-    return bool(re_match(r"https?:\/\/.+\.gdtot\.\S+|https?:\/\/(.+\.filepress|filebee|appdrive|gdflix|www.jiodrive)\.\S+", url))
+    return bool(
+        re_match(
+            r"https?:\/\/.+\.gdtot\.\S+|https?:\/\/(.+\.filepress|filebee|appdrive|gdflix|www.jiodrive)\.\S+",
+            url,
+        )
+    )
 
 
 def is_index_link(url):
@@ -303,7 +346,12 @@ def is_mega_link(url):
 
 
 def is_rclone_path(path):
-    return bool(re_match(r"^(mrcc:)?(?!magnet:)(?![- ])[a-zA-Z0-9_\. -]+(?<! ):(?!.*\/\/).*$|^rcl$", path))
+    return bool(
+        re_match(
+            r"^(mrcc:)?(?!magnet:)(?![- ])[a-zA-Z0-9_\. -]+(?<! ):(?!.*\/\/).*$|^rcl$",
+            path,
+        )
+    )
 
 
 def get_mega_link_type(url):
@@ -311,15 +359,18 @@ def get_mega_link_type(url):
 
 
 def arg_parser(items, arg_base):
-    if not items: return arg_base
+    if not items:
+        return arg_base
     bool_arg_set = {"-b", "-e", "-z", "-s", "-j", "-d"}
     t = len(items)
     i = 0
     arg_start = -1
+
     while i + 1 <= t:
         part = items[i].strip()
         if part in arg_base:
-            if arg_start == -1: arg_start = i
+            if arg_start == -1:
+                arg_start = i
             if i + 1 == t and part in bool_arg_set or part in ["-s", "-j"]:
                 arg_base[part] = True
             else:
@@ -335,6 +386,7 @@ def arg_parser(items, arg_base):
                 if sub_list:
                     arg_base[part] = " ".join(sub_list)
         i += 1
+
     link = []
     if items[0].strip() not in arg_base:
         if arg_start == -1:
@@ -356,10 +408,20 @@ async def get_content_type(url):
 
 
 def update_user_ldata(id_, key=None, value=None):
-    exception_keys = ["is_sudo", "is_auth", "dly_tasks", "is_blacklist", "token", "time"]
+    exception_keys = [
+        "is_sudo",
+        "is_auth",
+        "dly_tasks",
+        "is_blacklist",
+        "token",
+        "time",
+    ]
     if key is None and value is None:
         if id_ in user_data:
-            updated_data = {k: v for k, v in user_data[id_].items() if k in exception_keys}
+            updated_data = {}
+            for k, v in user_data[id_].items():
+                if k in exception_keys:
+                    updated_data[k] = v
             user_data[id_] = updated_data
         return
     user_data.setdefault(id_, {})
@@ -419,6 +481,18 @@ def new_thread(func):
         future = run_coroutine_threadsafe(func(*args, **kwargs), bot_loop)
         return future.result() if wait else future
     return wrapper
+
+
+async def compare_versions(v1, v2):
+    v1_parts = [int(part) for part in v1.split("-")[0][1:].split(".")]
+    v2_parts = [int(part) for part in v2.split("-")[0][1:].split(".")]
+    for i in range(3):
+        v1_part, v2_part = v1_parts[i], v2_parts[i]
+        if v1_part < v2_part:
+            return "New Version Update is Available! Check Now!"
+        elif v1_part > v2_part:
+            return "More Updated! Kindly Contribute in Official"
+    return "Already up to date with latest version"
 
 
 async def get_stats(event, key="home"):
