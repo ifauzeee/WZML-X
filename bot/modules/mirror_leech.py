@@ -1,353 +1,577 @@
-# FINAL AND CORRECTED __main__.py BASED ON YOUR .BAK
-from time import time, monotonic
-from datetime import datetime
-from sys import executable
-from os import execl as osexecl
-from asyncio import create_subprocess_exec, gather
-from uuid import uuid4
-from base64 import b64decode
-from importlib import import_module, reload
-from requests import get as rget
-from pytz import timezone
-from bs4 import BeautifulSoup
-from signal import signal, SIGINT
-from aiofiles.os import path as aiopath, remove as aioremove
-from aiofiles import open as aiopen
-from pyrogram import idle
-from pyrogram.enums import ChatMemberStatus, ChatType
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
-from pyrogram.filters import command, private, regex
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import Message
+from pyrogram.filters import command, regex
+from html import escape
+from traceback import format_exc
+from base64 import b64encode
+from re import match as re_match
+from asyncio import sleep, wrap_future
+from aiofiles import open as aiopen
+from aiofiles.os import path as aiopath
+from cloudscraper import create_scraper
+
 from bot import (
     bot,
-    user,
-    bot_name,
-    config_dict,
-    user_data,
-    botStartTime,
+    DOWNLOAD_DIR,
     LOGGER,
-    Interval,
-    DATABASE_URL,
-    QbInterval,
-    INCOMPLETE_TASK_NOTIFIER,
-    scheduler,
+    config_dict,
+    bot_name,
+    categories_dict,
+    user_data,
 )
-from bot.version import get_version
-from .helper.ext_utils.fs_utils import start_cleanup, clean_all, exit_clean_up
-from .helper.ext_utils.bot_utils import (
-    get_readable_time,
-    cmd_exec,
-    sync_to_async,
+from bot.helper.mirror_utils.download_utils.direct_downloader import add_direct_download
+from bot.helper.ext_utils.bot_utils import (
+    is_url,
+    is_magnet,
+    is_mega_link,
+    is_gdrive_link,
+    get_content_type,
     new_task,
-    set_commands,
-    update_user_ldata,
+    sync_to_async,
+    is_rclone_path,
+    is_telegram_link,
+    arg_parser,
+    fetch_user_tds,
+    fetch_user_dumps,
     get_stats,
 )
-from .helper.ext_utils.db_handler import DbManger
-from .helper.telegram_helper.bot_commands import BotCommands
-from .helper.telegram_helper.message_utils import (
+from bot.helper.ext_utils.exceptions import DirectDownloadLinkException
+from bot.helper.ext_utils.task_manager import task_utils
+from bot.helper.mirror_utils.download_utils.aria2_download import add_aria2c_download
+from bot.helper.mirror_utils.download_utils.gd_download import add_gd_download
+from bot.helper.mirror_utils.download_utils.qbit_download import add_qb_torrent
+from bot.helper.mirror_utils.download_utils.mega_download import add_mega_download
+from bot.helper.mirror_utils.download_utils.rclone_download import add_rclone_download
+from bot.helper.mirror_utils.rclone_utils.list import RcloneList
+from bot.helper.mirror_utils.upload_utils.gdriveTools import GoogleDriveHelper
+from bot.helper.mirror_utils.download_utils.direct_link_generator import (
+    direct_link_generator,
+)
+from bot.helper.mirror_utils.download_utils.telegram_download import (
+    TelegramDownloadHelper,
+)
+from bot.helper.telegram_helper.bot_commands import BotCommands
+from bot.helper.telegram_helper.filters import CustomFilters
+from bot.helper.telegram_helper.button_build import ButtonMaker
+from bot.helper.telegram_helper.message_utils import (
     sendMessage,
     editMessage,
     editReplyMarkup,
-    sendFile,
     deleteMessage,
-    delete_all_messages,
+    get_tg_link_content,
+    delete_links,
+    auto_delete_message,
+    open_category_btns,
+    open_dump_btns,
 )
-from .helper.telegram_helper.filters import CustomFilters
-from .helper.telegram_helper.button_build import ButtonMaker
-from .helper.listeners.aria2_listener import start_aria2_listener
-from .helper.themes import BotTheme
-from .modules import (
-    authorize,
-    clone,
-    gd_count,
-    gd_delete,
-    gd_list,
-    cancel_mirror,
-    mirror_leech,
-    status,
-    torrent_search,
-    torrent_select,
-    ytdlp,
-    rss,
-    shell,
-    eval,
-    users_settings,
-    bot_settings,
-    speedtest,
-    save_msg,
-    images,
-    imdb,
-    anilist,
-    mediainfo,
-    mydramalist,
-    gen_pyro_sess,
-    gd_clean,
-    broadcast,
+from bot.helper.listeners.tasks_listener import MirrorLeechListener
+from bot.helper.ext_utils.help_messages import (
+    MIRROR_HELP_MESSAGE,
+    CLONE_HELP_MESSAGE,
+    YT_HELP_MESSAGE,
+    help_string,
 )
-# We import the new callback handlers from our modified module
-from .modules.mirror_leech import mirror_leech_callback, wzmlxcb
-async def stats(client, message):
-    msg, btns = await get_stats(message)
-    await sendMessage(message, msg, btns, photo="IMAGES")
+from bot.modules.gen_pyro_sess import get_decrypt_key
+
+# --- CUSTOM FOLDER IDs ---
+CUSTOM_DESTINATIONS = {
+    'app':       '1tUCYi4x3l1_omXwspD2eiPlblBCJSgOV',
+    'video':     '1tKXmbfClZlpFi3NhXvM0aY2fJLk4Aw5R',
+    'audio':     '1M0eYHR0qg9OtzQUJT030b-x5fxt8DKAx',
+    'files':     '1gxPwlYhbKmzhYSk-ququFUzfBG5cj-lc',
+    'folder':    '1E9Ng9uMqJ2yAK8hqirp7EOImSGgKecW6',
+}
+
+# --- CATEGORY DISPLAY NAMES ---
+CATEGORY_DISPLAY_NAMES = {
+    'video': '🎬 Video',
+    'audio': '🎵 Audio',
+    'app': '📦 Aplikasi',
+    'files': '📄 Dokumen',
+    'folder': '🗂️ Arsip (ZIP/RAR)',
+}
+
 @new_task
-async def start(client, message):
-    buttons = ButtonMaker()
-    buttons.ubutton(BotTheme("ST_BN1_NAME"), BotTheme("ST_BN1_URL"))
-    buttons.ubutton(BotTheme("ST_BN2_NAME"), BotTheme("ST_BN2_URL"))
-    reply_markup = buttons.build_menu(2)
-    if len(message.command) > 1 and message.command[1] == "wzmlx":
-        await deleteMessage(message)
-    elif len(message.command) > 1 and config_dict["TOKEN_TIMEOUT"]:
-        userid = message.from_user.id
-        encrypted_url = message.command[1]
-        input_token, pre_uid = (b64decode(encrypted_url.encode()).decode()).split("&&")
-        if int(pre_uid) != userid:
-            return await sendMessage(message, BotTheme("OWN_TOKEN_GENERATE"))
-        data = user_data.get(userid, {})
-        if "token" not in data or data["token"] != input_token:
-            return await sendMessage(message, BotTheme("USED_TOKEN"))
-        elif (
-            config_dict["LOGIN_PASS"] is not None
-            and data["token"] == config_dict["LOGIN_PASS"]
-        ):
-            return await sendMessage(message, BotTheme("LOGGED_PASSWORD"))
-        buttons.ibutton(BotTheme("ACTIVATE_BUTTON"), f"pass {input_token}", "header")
-        reply_markup = buttons.build_menu(2)
-        msg = BotTheme(
-            "TOKEN_MSG",
-            token=input_token,
-            validity=get_readable_time(int(config_dict["TOKEN_TIMEOUT"])),
-        )
-        return await sendMessage(message, msg, reply_markup)
-    elif await CustomFilters.authorized(client, message):
-        start_string = BotTheme("ST_MSG", help_command=f"/{BotCommands.HelpCommand}")
-        await sendMessage(message, start_string, reply_markup, photo="IMAGES")
-    elif config_dict["BOT_PM"]:
-        await sendMessage(message, BotTheme("ST_BOTPM"), reply_markup, photo="IMAGES")
-    else:
-        await sendMessage(message, BotTheme("ST_UNAUTH"), reply_markup, photo="IMAGES")
-    await DbManger().update_pm_users(message.from_user.id)
-async def token_callback(_, query):
-    user_id = query.from_user.id
-    input_token = query.data.split()[1]
-    data = user_data.get(user_id, {})
-    if "token" not in data or data["token"] != input_token:
-        return await query.answer("Already Used, Generate New One", show_alert=True)
-    update_user_ldata(user_id, "token", str(uuid4()))
-    update_user_ldata(user_id, "time", time())
-    await query.answer("Activated Temporary Token!", show_alert=True)
-    kb = query.message.reply_markup.inline_keyboard[1:]
-    kb.insert(
-        0, [InlineKeyboardButton(BotTheme("ACTIVATED"), callback_data="pass activated")]
-    )
-    await editReplyMarkup(query.message, InlineKeyboardMarkup(kb))
-async def login(_, message):
-    if config_dict["LOGIN_PASS"] is None:
-        return
-    elif len(message.command) > 1:
-        user_id = message.from_user.id
-        input_pass = message.command[1]
-        if user_data.get(user_id, {}).get("token", "") == config_dict["LOGIN_PASS"]:
-            return await sendMessage(message, BotTheme("LOGGED_IN"))
-        if input_pass != config_dict["LOGIN_PASS"]:
-            return await sendMessage(message, BotTheme("INVALID_PASS"))
-        update_user_ldata(user_id, "token", config_dict["LOGIN_PASS"])
-        return await sendMessage(message, BotTheme("PASS_LOGGED"))
-    else:
-        await sendMessage(message, BotTheme("LOGIN_USED"))
-async def restart(client, message):
-    restart_message = await sendMessage(message, BotTheme("RESTARTING"))
-    if scheduler.running:
-        scheduler.shutdown(wait=False)
-    await delete_all_messages()
-    for interval in [QbInterval, Interval]:
-        if interval:
-            interval[0].cancel()
-    await sync_to_async(clean_all)
-    proc1 = await create_subprocess_exec(
-        "pkill", "-9", "-f", "gunicorn|aria2c|qbittorrent-nox|ffmpeg|rclone"
-    )
-    proc2 = await create_subprocess_exec("python3", "update.py")
-    await gather(proc1.wait(), proc2.wait())
-    async with aiopen(".restartmsg", "w") as f:
-        await f.write(f"{restart_message.chat.id}\n{restart_message.id}\n")
-    osexecl(executable, executable, "-m", "bot")
-async def ping(_, message):
-    start_time = monotonic()
-    reply = await sendMessage(message, BotTheme("PING"))
-    end_time = monotonic()
-    await editMessage(
-        reply, BotTheme("PING_VALUE", value=int((end_time - start_time) * 1000))
-    )
-async def log(_, message):
-    buttons = ButtonMaker()
-    buttons.ibutton(
-        BotTheme("LOG_DISPLAY_BT"), f"wzmlx {message.from_user.id} logdisplay"
-    )
-    buttons.ibutton(BotTheme("WEB_PASTE_BT"), f"wzmlx {message.from_user.id} webpaste")
-    await sendFile(message, "log.txt", buttons=buttons.build_menu(1))
-async def search_images():
-    if not (query_list := config_dict.get("IMG_SEARCH")):
-        return
-    try:
-        total_pages = config_dict.get("IMG_PAGE", 1)
-        base_url = "https://www.wallpaperflare.com/search"
-        for query in query_list:
-            query = query.strip().replace(" ", "+")
-            for page in range(1, total_pages + 1):
-                url = f"{base_url}?wallpaper={query}&width=1280&height=720&page={page}"
-                r = rget(url)
-                soup = BeautifulSoup(r.text, "html.parser")
-                images = soup.select(
-                    'img[data-src^="https://c4.wallpaperflare.com/wallpaper"]'
-                )
-                if len(images) == 0:
-                    LOGGER.info(
-                        "Maybe Site is Blocked on your Server, Add Images Manually !!"
-                    )
-                for img in images:
-                    img_url = img["data-src"]
-                    if img_url not in config_dict["IMAGES"]:
-                        config_dict["IMAGES"].append(img_url)
-        if len(config_dict["IMAGES"]) != 0:
-            config_dict["STATUS_LIMIT"] = 2
-        if DATABASE_URL:
-            await DbManger().update_config(
-                {
-                    "IMAGES": config_dict["IMAGES"],
-                    "STATUS_LIMIT": config_dict["STATUS_LIMIT"],
-                }
-            )
-    except Exception as e:
-        LOGGER.error(f"An error occurred: {e}")
-async def bot_help(client, message):
-    buttons = ButtonMaker()
-    user_id = message.from_user.id
-    buttons.ibutton(BotTheme("BASIC_BT"), f"wzmlx {user_id} guide basic")
-    buttons.ibutton(BotTheme("USER_BT"), f"wzmlx {user_id} guide users")
-    buttons.ibutton(BotTheme("MICS_BT"), f"wzmlx {user_id} guide miscs")
-    buttons.ibutton(BotTheme("O_S_BT"), f"wzmlx {user_id} guide admin")
-    buttons.ibutton(BotTheme("CLOSE_BT"), f"wzmlx {user_id} close")
-    await sendMessage(message, BotTheme("HELP_HEADER"), buttons.build_menu(2))
-async def restart_notification():
-    now = datetime.now(timezone(config_dict["TIMEZONE"]))
-    if await aiopath.isfile(".restartmsg"):
-        with open(".restartmsg") as f:
-            chat_id, msg_id = map(int, f)
-    else:
-        chat_id, msg_id = 0, 0
-    async def send_incompelete_task_message(cid, msg):
+async def _mirror_leech(
+    client, message, isQbit=False, isLeech=False, sameDir=None, bulk=[], custom_upload_path=None
+):
+    text = message.text.split("\n")
+    input_list = text[0].split(" ")
+
+    arg_base = {
+        "link": "", "-i": "0", "-m": "", "-sd": "", "-samedir": "", "-d": False, "-seed": False,
+        "-j": False, "-join": False, "-s": False, "-select": False, "-b": False, "-bulk": False,
+        "-n": "", "-name": "", "-e": False, "-extract": False, "-uz": False, "-unzip": False,
+        "-z": False, "-zip": False, "-up": "", "-upload": "", "-rcf": "", "-u": "", "-user": "",
+        "-p": "", "-pass": "", "-id": "", "-index": "", "-c": "", "-category": "",
+        "-ud": "", "-dump": "", "-h": "", "-headers": "", "-ss": "0", "-screenshots": "",
+        "-t": "", "-thumb": "",
+    }
+
+    args = arg_parser(input_list[1:], arg_base)
+    cmd = input_list[0].split("@")[0]
+    multi = int(args["-i"]) if args["-i"].isdigit() else 0
+    link = args["link"]
+    folder_name = args["-m"] or args["-sd"] or args["-samedir"]
+    seed = args["-d"] or args["-seed"]
+    join = args["-j"] or args["-join"]
+    select = args["-s"] or args["-select"]
+    isBulk = args["-b"] or args["-bulk"]
+    name = args["-n"] or args["-name"]
+    extract = (args["-e"] or args["-extract"] or args["-uz"] or args["-unzip"] or "uz" in cmd or "unzip" in cmd)
+    compress = (args["-z"] or args["-zip"] or (not extract and ("z" in cmd or "zip" in cmd)))
+    up = args["-up"] or args["-upload"]
+    rcf = args["-rcf"]
+    drive_id = args["-id"]
+    index_link = args["-index"]
+    gd_cat = args["-c"] or args["-category"]
+    user_dump = args["-ud"] or args["-dump"]
+    headers = args["-h"] or args["-headers"]
+    ussr = args["-u"] or args["-user"]
+    pssw = args["-p"] or args["-pass"]
+    thumb = args["-t"] or args["-thumb"]
+    sshots_arg = args["-ss"] or args["-screenshots"]
+    sshots = int(sshots_arg) if sshots_arg.isdigit() else 0
+    bulk_start = 0
+    bulk_end = 0
+    ratio = None
+    seed_time = None
+    reply_to = None
+    file_ = None
+    session = ""
+    decrypter = None
+        
+    if not isinstance(seed, bool):
+        dargs = seed.split(":")
+        ratio = dargs[0] or None
+        if len(dargs) == 2:
+            seed_time = dargs[1] or None
+        seed = True
+
+    if not isinstance(isBulk, bool):
+        dargs = isBulk.split(":")
+        bulk_start = dargs[0] or None
+        if len(dargs) == 2:
+            bulk_end = dargs[1] or None
+        isBulk = True
+
+    if drive_id and is_gdrive_link(drive_id):
+        drive_id = GoogleDriveHelper.getIdFromUrl(drive_id)
+
+    if folder_name and not isBulk:
+        seed = False
+        ratio = None
+        seed_time = None
+        folder_name = f"/{folder_name}"
+        if sameDir is None:
+            sameDir = {"total": multi, "tasks": set(), "name": folder_name}
+        sameDir["tasks"].add(message.id)
+
+    if isBulk:
         try:
-            if msg.startswith("⌬ <b><i>Restarted Successfully!</i></b>"):
-                await bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=msg_id,
-                    text=msg,
-                    disable_web_page_preview=True,
-                )
-                await aioremove(".restartmsg")
+            bulk = await extract_bulk_links(message, bulk_start, bulk_end)
+            if len(bulk) == 0:
+                raise ValueError("Bulk Empty!")
+        except:
+            await sendMessage(message, "Reply to a text file or a tg message that has links separated by a new line!")
+            return
+        b_msg = input_list[:1]
+        b_msg.append(f"{bulk[0]} -i {len(bulk)}")
+        nextmsg = await sendMessage(message, " ".join(b_msg))
+        nextmsg = await client.get_messages(chat_id=message.chat.id, message_ids=nextmsg.id)
+        nextmsg.from_user = message.from_user
+        _mirror_leech(client, nextmsg, isQbit, isLeech, sameDir, bulk)
+        return
+
+    if len(bulk) != 0:
+        del bulk[0]
+
+    @new_task
+    async def __run_multi():
+        if multi <= 1:
+            return
+        await sleep(5)
+        if len(bulk) != 0:
+            msg = input_list[:1]
+            msg.append(f"{bulk[0]} -i {multi - 1}")
+            nextmsg = await sendMessage(message, " ".join(msg))
+        else:
+            msg = [s.strip() for s in input_list]
+            index = msg.index("-i")
+            msg[index + 1] = f"{multi - 1}"
+            nextmsg = await client.get_messages(chat_id=message.chat.id, message_ids=message.reply_to_message_id + 1)
+            nextmsg = await sendMessage(nextmsg, " ".join(msg))
+        nextmsg = await client.get_messages(chat_id=message.chat.id, message_ids=nextmsg.id)
+        if folder_name:
+            sameDir["tasks"].add(nextmsg.id)
+        nextmsg.from_user = message.from_user
+        await sleep(5)
+        _mirror_leech(client, nextmsg, isQbit, isLeech, sameDir, bulk)
+
+    __run_multi()
+
+    path = f"{DOWNLOAD_DIR}{message.id}{folder_name}"
+    
+    sender_chat = message.sender_chat
+    if sender_chat:
+        tag = sender_chat.title
+    else:
+        tag = message.from_user.mention
+    
+    reply_to = message.reply_to_message
+    if not link and reply_to:
+        if reply_to.text:
+            link = reply_to.text.split("\n", 1)[0].strip()
+            
+    if link and is_telegram_link(link):
+        try:
+            reply_to, session = await get_tg_link_content(link, message.from_user.id)
+            decrypter = get_decrypt_key() if session else None
+        except Exception as e:
+            await sendMessage(message, f"ERROR: {e}")
+            return
+
+    if reply_to:
+        file_ = getattr(reply_to, reply_to.media.value) if reply_to.media else None
+        if file_ is None and reply_to.text:
+            reply_text = reply_to.text.split("\n", 1)[0].strip()
+            if is_url(reply_text) or is_magnet(reply_text):
+                link = reply_text
+        elif reply_to.document and (file_.mime_type == "application/x-bittorrent" or file_.file_name.endswith(".torrent")):
+            link = await reply_to.download()
+            file_ = None
+
+    if (not is_url(link) and not is_magnet(link) and not await aiopath.exists(link) and not is_rclone_path(link) and file_ is None):
+        await sendMessage(message, MIRROR_HELP_MESSAGE[0])
+        return
+
+    error_msg = []
+    error_button = None
+    task_utilis_msg, error_button = await task_utils(message)
+    if error_msg:
+        error_msg.extend(task_utilis_msg)
+
+    if error_msg:
+        final_msg = f"Hey {tag},\n"
+        for __i, __msg in enumerate(error_msg, 1):
+            final_msg += f"\n<b>{__i}</b>: {__msg}\n"
+        if error_button is not None:
+            error_button = error_button.build_menu(2)
+        await sendMessage(message, final_msg, error_button)
+        return
+
+    org_link = link
+    if link:
+        LOGGER.info(link)
+
+    if not isLeech:
+        if custom_upload_path:
+            drive_id = custom_upload_path
+            up = 'gd'
+        if not up:
+            if config_dict["DEFAULT_UPLOAD"] == "rc":
+                up = config_dict.get("RCLONE_PATH", "")
             else:
-                await bot.send_message(
-                    chat_id=cid,
-                    text=msg,
-                    disable_web_page_preview=True,
-                    disable_notification=True,
-                )
-        except Exception as e:
-            LOGGER.error(e)
-    if INCOMPLETE_TASK_NOTIFIER and DATABASE_URL:
-        if notifier_dict := await DbManger().get_incomplete_tasks():
-            for cid, data in notifier_dict.items():
-                msg = (
-                    BotTheme(
-                        "RESTART_SUCCESS",
-                        time=now.strftime("%I:%M:%S %p"),
-                        date=now.strftime("%d/%m/%y"),
-                        timz=config_dict["TIMEZONE"],
-                        version=get_version(),
-                    )
-                    if cid == chat_id
-                    else BotTheme("RESTARTED")
-                )
-                msg += "\n\n⌬ <b><i>Incomplete Tasks!</i></b>"
-                for tag, links in data.items():
-                    msg += f"\n➲ <b>User:</b> {tag}\n┖ <b>Tasks:</b>"
-                    for index, link in enumerate(links, start=1):
-                        msg_link, source = next(iter(link.items()))
-                        msg += f" {index}. <a href='{source}'>S</a> ->  <a href='{msg_link}'>L</a> |"
-                        if len(msg.encode()) > 4000:
-                            await send_incompelete_task_message(cid, msg)
-                            msg = ""
-                if msg:
-                    await send_incompelete_task_message(cid, msg)
-    if await aiopath.isfile(".restartmsg"):
-        try:
-            await bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=msg_id,
-                text=BotTheme(
-                    "RESTART_SUCCESS",
-                    time=now.strftime("%I:%M:%S %p"),
-                    date=now.strftime("%d/%m/%y"),
-                    timz=config_dict["TIMEZONE"],
-                    version=get_version(),
-                ),
-            )
-        except Exception as e:
-            LOGGER.error(e)
-        await aioremove(".restartmsg")
-async def log_check():
-    if LEECH_LOG_ID := config_dict.get("LEECH_LOG_ID"):
-        for chat_id in LEECH_LOG_ID.split():
-            try:
-                chat = await bot.get_chat(int(chat_id))
-                LOGGER.info(f"Successfully connected to Leech Log Chat ID: {chat_id}")
-            except Exception as e:
-                LOGGER.error(f"Could not connect to Leech Log Chat ID: {chat_id}. ERROR: {e}")
-async def main():
-    await gather(
-        start_cleanup(),
-        torrent_search.initiate_search_tools(),
-        restart_notification(),
-        search_images(),
-        set_commands(bot),
-        log_check(),
-    )
-    await sync_to_async(start_aria2_listener, wait=False)
-    # Standard handlers from original file
-    bot.add_handler(MessageHandler(start, filters=command(BotCommands.StartCommand)))
-    bot.add_handler(CallbackQueryHandler(token_callback, filters=regex(r"^pass")))
-    bot.add_handler(MessageHandler(login, filters=command(BotCommands.LoginCommand) & private))
-    bot.add_handler(MessageHandler(log, filters=command(BotCommands.LogCommand) & CustomFilters.sudo))
-    bot.add_handler(MessageHandler(restart, filters=command(BotCommands.RestartCommand) & CustomFilters.sudo))
-    bot.add_handler(MessageHandler(ping, filters=command(BotCommands.PingCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(bot_help, filters=command(BotCommands.HelpCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(stats, filters=command(BotCommands.StatsCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    
-    # Custom category button handler
-    bot.add_handler(CallbackQueryHandler(mirror_leech_callback, filters=regex(r"cat_up")))
-    
-    # Other callback from original file
-    bot.add_handler(CallbackQueryHandler(wzmlxcb, filters=regex(r"^wzmlx")))
-    
-    # All command handlers
-    bot.add_handler(MessageHandler(mirror_leech.mirror, filters=command(BotCommands.MirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(mirror_leech.qb_mirror, filters=command(BotCommands.QbMirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(ytdlp.ytdl, filters=command(BotCommands.YtdlCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(mirror_leech.leech, filters=command(BotCommands.LeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(mirror_leech.qb_leech, filters=command(BotCommands.QbLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(ytdlp.ytdlleech, filters=command(BotCommands.YtdlLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted)) # Corrected function name
-    
-    LOGGER.info(f"WZML-X Bot [@{bot_name}] Started!")
-    if user:
-        LOGGER.info(f"WZ's User [@{user.me.username}] Ready!")
-    signal(SIGINT, exit_clean_up)
-async def stop_signals():
-    if user:
-        await gather(bot.stop(), user.stop())
+                up = "gd"
+        if up == "gd" and not drive_id and not config_dict.get("GDRIVE_ID"):
+             await sendMessage(message, "GDRIVE_ID not Provided!")
+             return
+        if up == "gd" and drive_id and not await sync_to_async(GoogleDriveHelper().getFolderData, drive_id):
+            return await sendMessage(message, "Google Drive ID validation failed!!")
+        if not up:
+            await sendMessage(message, "No Upload Destination specified!")
+            return
+        if up != 'gd' and not is_rclone_path(up):
+            await sendMessage(message, f"Wrong Rclone Upload Destination: {up}")
+            return
     else:
-        await bot.stop()
-bot.loop.run_until_complete(main())
-bot.loop.run_until_complete(idle())
-bot.loop.run_until_complete(stop_signals())
+        up = 'leech'
+
+    listener = MirrorLeechListener(message, compress, extract, isQbit, isLeech, tag, select, seed, sameDir, rcf, up, join, drive_id=drive_id, index_link=index_link, source_url=org_link, leech_utils={"screenshots": sshots, "thumb": thumb})
+
+    if file_ is not None:
+        try:
+            await TelegramDownloadHelper(listener).add_download(reply_to, f"{path}/", name, session, decrypter)
+        except Exception as e:
+            LOGGER.error(f"Failed to start Telegram download: {e}")
+            await sendMessage(message, "Gagal memulai unduhan file Telegram. Silakan periksa log untuk detail.")
+            return
+    elif is_rclone_path(link):
+        await add_rclone_download(link, config_dict.get("RCLONE_CONFIG"), f"{path}/", name, listener)
+    elif is_gdrive_link(link):
+        await add_gd_download(link, path, listener, name)
+    elif is_mega_link(link):
+        await add_mega_download(link, f"{path}/", listener, name)
+    elif isQbit:
+        await add_qb_torrent(link, path, listener, ratio, seed_time)
+    else:
+        headers = ""
+        if ussr or pssw:
+            auth = f"{ussr}:{pssw}"
+            headers = f"authorization: Basic {b64encode(auth.encode()).decode('ascii')}"
+        await add_aria2c_download(link, path, listener, name, headers, ratio, seed_time)
+
+# --- START OF CUSTOM CATEGORY LOGIC ---
+
+def get_file_category(link, reply_to_message):
+    media = reply_to_message
+    if media:
+        if media.video: return 'video'
+        if media.audio or media.voice: return 'audio'
+        if media.document:
+            mime_type = media.document.mime_type or ""
+            file_name = media.document.file_name or ""
+            if mime_type == 'application/vnd.android.package-archive' or file_name.lower().endswith('.apk'):
+                return 'app'
+            if 'zip' in mime_type or 'rar' in mime_type or file_name.lower().endswith('.7z'):
+                return 'folder'
+            if any(x in mime_type for x in ['pdf', 'word', 'powerpoint', 'excel']):
+                return 'files'
+    
+    link_lower = link.lower() if link else ""
+    if is_magnet(link_lower): return 'folder'
+    if '.apk' in link_lower: return 'app'
+    if any(ext in link_lower for ext in ['.mp4', '.mkv', '.webm', '.flv', '.mov']): return 'video'
+    if any(ext in link_lower for ext in ['.mp3', '.flac', '.wav', '.m4a']): return 'audio'
+    if any(ext in link_lower for ext in ['.zip', '.rar', '.7z']): return 'folder'
+    if any(ext in link_lower for ext in ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx']): return 'files'
+    
+    return 'files'
+
+async def category_selection_logic(client, message: Message, isQbit=False, isLeech=False):
+    isBulk = 'bulk' in message.text.split(' ')[0].lower()
+    
+    link = ""
+    reply_to = message.reply_to_message
+    if reply_to:
+        if reply_to.text:
+            link = reply_to.text.strip()
+        elif reply_to.media:
+            link = reply_to.text or reply_to.caption or ""
+
+    if not link and not (reply_to and reply_to.media):
+        command_parts = message.text.split(' ', 1)
+        if len(command_parts) > 1:
+            link = command_parts[1].strip()
+
+    if not link and not (reply_to and reply_to.media):
+        return await sendMessage(message, "Tidak ada link/file yang valid untuk di-mirror.")
+
+    category = get_file_category(link, reply_to)
+    user_id = message.from_user.id
+    buttons = ButtonMaker()
+    
+    msg = f"<b>Tipe file terdeteksi:</b> <code>{CATEGORY_DISPLAY_NAMES[category]}</code>\n"
+    msg += "Pilih folder tujuan untuk melanjutkan mirror:"
+
+    flags = f"{isQbit}|{isLeech}|{isBulk}|{message.id}"
+
+    buttons.ibutton("🎬 Video", f"cat_up|video|{user_id}|{flags}")
+    buttons.ibutton("🎵 Audio", f"cat_up|audio|{user_id}|{flags}")
+    buttons.ibutton("📦 Aplikasi", f"cat_up|app|{user_id}|{flags}")
+    buttons.ibutton("📄 Dokumen", f"cat_up|files|{user_id}|{flags}")
+    buttons.ibutton("🗂️ Arsip (ZIP/RAR)", f"cat_up|folder|{user_id}|{flags}")
+    buttons.ibutton("❌ Batal", f"cat_up|cancel|{user_id}|{flags}")
+
+    await sendMessage(message, msg, buttons.build_menu(2))
+
+async def mirror_leech_callback(client, callback_query):
+    query = callback_query
+    user_id = query.from_user.id
+    message = query.message
+    data = query.data.split("|")
+
+    try:
+        if int(data[2]) != user_id and not await CustomFilters.sudo(client, query):
+            return await query.answer("Ini bukan pilihan untukmu!", show_alert=True)
+    except IndexError:
+        return await query.answer("Callback error!", show_alert=True)
+    
+    if data[1] == "cancel":
+        await query.answer()
+        return await deleteMessage(message)
+
+    await query.answer()
+    category_key = data[1]
+    up_path = CUSTOM_DESTINATIONS.get(category_key)
+    
+    if not up_path:
+        return await editMessage(message, "Kategori tidak valid!")
+
+    try:
+        flags_data = data[3:]
+        isQbit = flags_data[0] == 'True'
+        isLeech = flags_data[1] == 'True'
+        isBulk = flags_data[2] == 'True'
+        original_msg_id = int(flags_data[3])
+    except (ValueError, IndexError):
+        return await editMessage(message, "Error: Callback data tidak lengkap. Harap mulai lagi.")
+    
+    try:
+        original_message = await client.get_messages(chat_id=message.chat.id, message_ids=original_msg_id)
+    except Exception as e:
+        LOGGER.error(f"Could not get original message: {e}")
+        return await editMessage(message, "Error: Tidak dapat menemukan pesan asli. Harap mulai lagi.")
+
+    await editMessage(message, f"✅ Oke! File akan di-mirror ke folder {CATEGORY_DISPLAY_NAMES[category_key]}.")
+    await _mirror_leech(client, original_message, isQbit=isQbit, isLeech=isLeech, custom_upload_path=up_path)
+
+async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech=False):
+    text_args = message.text.split()
+    if any(arg in ['-s', '-select', '-up', '-samedir', '-sd', '-m'] for arg in text_args):
+        await _mirror_leech(client, message, isQbit, isLeech)
+    else:
+        await category_selection_logic(client, message, isQbit, isLeech)
+
+@new_task
+async def wzmlxcb(_, query):
+    message = query.message
+    user_id = query.from_user.id
+    data = query.data.split()
+    if user_id != int(data[1]):
+        return await query.answer(text="Not Yours!", show_alert=True)
+    elif data[2] == "logdisplay":
+        await query.answer()
+        async with aiopen("log.txt", "r") as f:
+            logFileLines = (await f.read()).splitlines()
+        def parseline(line):
+            try:
+                return "[" + line.split("] [", 1)[1]
+            except IndexError:
+                return line
+        ind, Loglines = 1, ""
+        try:
+            while len(Loglines) <= 3500:
+                Loglines = parseline(logFileLines[-ind]) + "\n" + Loglines
+                if ind == len(logFileLines):
+                    break
+                ind += 1
+            startLine = f"<b>Showing Last {ind} Lines from log.txt:</b> \n\n----------<b>START LOG</b>----------\n\n"
+            endLine = "\n----------<b>END LOG</b>----------"
+            btn = ButtonMaker()
+            btn.ibutton("Cʟᴏsᴇ", f"wzmlx {user_id} close")
+            await sendMessage(
+                message, startLine + escape(Loglines) + endLine, btn.build_menu(1)
+            )
+            await editReplyMarkup(message, None)
+        except Exception as err:
+            LOGGER.error(f"TG Log Display : {str(err)}")
+    elif data[2] == "webpaste":
+        await query.answer()
+        async with aiopen("log.txt", "r") as f:
+            logFile = await f.read()
+        cget = create_scraper().request
+        resp = cget(
+            "POST",
+            "https://spaceb.in/api/v1/documents",
+            data={"content": logFile, "extension": "None"},
+        ).json()
+        if resp["status"] == 201:
+            btn = ButtonMaker()
+            btn.ubutton(
+                "📨 Web Paste (SB)", f"https://spaceb.in/{resp['payload']['id']}"
+            )
+            await editReplyMarkup(message, btn.build_menu(1))
+        else:
+            LOGGER.error(f"Web Paste Failed : {str(err)}")
+    elif data[2] == "botpm":
+        await query.answer(url=f"https://t.me/{bot_name}?start=wzmlx")
+    elif data[2] == "help":
+        await query.answer()
+        btn = ButtonMaker()
+        btn.ibutton("Cʟᴏsᴇ", f"wzmlx {user_id} close")
+        if data[3] == "CLONE":
+            await editMessage(message, CLONE_HELP_MESSAGE[1], btn.build_menu(1))
+        elif data[3] == "MIRROR":
+            if len(data) == 4:
+                msg = MIRROR_HELP_MESSAGE[1][:4000]
+                btn.ibutton("Nᴇxᴛ Pᴀɢᴇ", f"wzmlx {user_id} help MIRROR readmore")
+            else:
+                msg = MIRROR_HELP_MESSAGE[1][4000:]
+                btn.ibutton("Pʀᴇ Pᴀɢᴇ", f"wzmlx {user_id} help MIRROR")
+            await editMessage(message, msg, btn.build_menu(2))
+        if data[3] == "YT":
+            await editMessage(message, YT_HELP_MESSAGE[1], btn.build_menu(1))
+    elif data[2] == "guide":
+        btn = ButtonMaker()
+        btn.ibutton("Bᴀᴄᴋ", f"wzmlx {user_id} guide home")
+        btn.ibutton("Cʟᴏsᴇ", f"wzmlx {user_id} close")
+        if data[3] == "basic":
+            await editMessage(message, help_string[0], btn.build_menu(2))
+        elif data[3] == "users":
+            await editMessage(message, help_string[1], btn.build_menu(2))
+        elif data[3] == "miscs":
+            await editMessage(message, help_string[3], btn.build_menu(2))
+        elif data[3] == "admin":
+            if not await CustomFilters.sudo("", query):
+                return await query.answer("Not Sudo or Owner!", show_alert=True)
+            await editMessage(message, help_string[2], btn.build_menu(2))
+        else:
+            buttons = ButtonMaker()
+            buttons.ibutton("Basic", f"wzmlx {user_id} guide basic")
+            buttons.ibutton("Users", f"wzmlx {user_id} guide users")
+            buttons.ibutton("Mics", f"wzmlx {user_id} guide miscs")
+            buttons.ibutton("Owner & Sudos", f"wzmlx {user_id} guide admin")
+            buttons.ibutton("Close", f"wzmlx {user_id} close")
+            await editMessage(
+                message,
+                "㊂ <b><i>Help Guide Menu!</i></b>\n\n<b>NOTE: <i>Click on any CMD to see more minor detalis.</i></b>",
+                buttons.build_menu(2),
+            )
+        await query.answer()
+    elif data[2] == "stats":
+        msg, btn = await get_stats(query, data[3])
+        await editMessage(message, msg, btn, "IMAGES")
+    else:
+        await query.answer()
+        await deleteMessage(message)
+        if message.reply_to_message:
+            await deleteMessage(message.reply_to_message)
+            if message.reply_to_message.reply_to_message:
+                await deleteMessage(message.reply_to_message.reply_to_message)
+
+async def mirror(client, message):
+    await run_mirror_leech_entry(client, message)
+
+async def qb_mirror(client, message):
+    await run_mirror_leech_entry(client, message, isQbit=True)
+
+async def leech(client, message):
+    await run_mirror_leech_entry(client, message, isLeech=True)
+
+async def qb_leech(client, message):
+    await run_mirror_leech_entry(client, message, isQbit=True, isLeech=True)
+
+bot.add_handler(
+    MessageHandler(
+        mirror,
+        filters=command(BotCommands.MirrorCommand)
+        & CustomFilters.authorized
+        & ~CustomFilters.blacklisted,
+    )
+)
+bot.add_handler(
+    MessageHandler(
+        qb_mirror,
+        filters=command(BotCommands.QbMirrorCommand)
+        & CustomFilters.authorized
+        & ~CustomFilters.blacklisted,
+    )
+)
+bot.add_handler(
+    MessageHandler(
+        leech,
+        filters=command(BotCommands.LeechCommand)
+        & CustomFilters.authorized
+        & ~CustomFilters.blacklisted,
+    )
+)
+bot.add_handler(
+    MessageHandler(
+        qb_leech,
+        filters=command(BotCommands.QbLeechCommand)
+        & CustomFilters.authorized
+        & ~CustomFilters.blacklisted,
+    )
+)
+bot.add_handler(CallbackQueryHandler(wzmlxcb, filters=regex(r"^wzmlx")))
