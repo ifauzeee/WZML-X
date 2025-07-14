@@ -1,21 +1,27 @@
 #!/usr/bin/env python3
+from time import time
 from bot.helper.ext_utils.bot_utils import (
     MirrorStatus,
     get_readable_file_size,
     get_readable_time,
+    get_progress_bar_string,
 )
 
-
 class DDLStatus:
-    def __init__(self, obj, size, message, gid, upload_details):
+    def __init__(self, obj, size, listener, gid):
         self.__obj = obj
         self.__size = size
         self.__gid = gid
-        self.upload_details = upload_details
-        self.message = message
+        self.listener = listener
+
+    def progress_bar(self):
+        return get_progress_bar_string(self)
+
+    def progress_message(self):
+        return self.listener._getStatusMessage(self.name(), self.size(), self.gid())
 
     def processed_bytes(self):
-        return get_readable_file_size(self.__obj.processed_bytes)
+        return self.__obj.processed_bytes
 
     def size(self):
         return get_readable_file_size(self.__size)
@@ -29,7 +35,7 @@ class DDLStatus:
     def progress(self):
         try:
             progress_raw = self.__obj.processed_bytes / self.__size * 100
-        except Exception:
+        except:
             progress_raw = 0
         return f"{round(progress_raw, 2)}%"
 
@@ -40,7 +46,7 @@ class DDLStatus:
         try:
             seconds = (self.__size - self.__obj.processed_bytes) / self.__obj.speed
             return get_readable_time(seconds)
-        except Exception:
+        except:
             return "-"
 
     def gid(self) -> str:
@@ -48,6 +54,3 @@ class DDLStatus:
 
     def download(self):
         return self.__obj
-
-    def eng(self):
-        return self.__obj.engine
