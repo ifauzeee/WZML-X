@@ -82,6 +82,15 @@ CUSTOM_DESTINATIONS = {
     'folder':    '1E9Ng9uMqJ2yAK8hqirp7EOImSGgKecW6',
 }
 
+# --- CATEGORY DISPLAY NAMES ---
+CATEGORY_DISPLAY_NAMES = {
+    'video': '🎬 Video',
+    'audio': '🎵 Audio',
+    'app': '📦 Aplikasi',
+    'files': '📄 Dokumen',
+    'folder': '🗂️ Arsip (ZIP/RAR)',
+}
+
 @new_task
 async def _mirror_leech(
     client, message, isQbit=False, isLeech=False, sameDir=None, bulk=[], custom_upload_path=None
@@ -352,7 +361,7 @@ async def category_selection_logic(client, message: Message, isQbit=False, isLee
     user_id = message.from_user.id
     buttons = ButtonMaker()
     
-    msg = f"<b>Tipe file terdeteksi:</b> <code>{category.upper()}</code>\n"
+    msg = f"<b>Tipe file terdeteksi:</b> <code>{CATEGORY_DISPLAY_NAMES[category]}</code>\n"
     msg += "Pilih folder tujuan untuk melanjutkan mirror:"
 
     flags = f"{isQbit}|{isLeech}|{isBulk}|{message.id}"
@@ -404,7 +413,7 @@ async def mirror_leech_callback(client, callback_query):
         LOGGER.error(f"Could not get original message: {e}")
         return await editMessage(message, "Error: Tidak dapat menemukan pesan asli. Harap mulai lagi.")
 
-    await editMessage(message, f"✅ Oke! File akan di-mirror ke folder {category_key.upper()}.")
+    await editMessage(message, f"✅ Oke! File akan di-mirror ke folder {CATEGORY_DISPLAY_NAMES[category_key]}.")
     await _mirror_leech(client, original_message, isQbit=isQbit, isLeech=isLeech, custom_upload_path=up_path)
 
 async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech=False):
