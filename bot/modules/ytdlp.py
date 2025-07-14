@@ -1,9 +1,9 @@
-# FINAL YTDLP CODE (V17 - Manual Quality, Auto Destination for Mirror)
+# FINAL YTDLP CODE (V18 - Rewritten with client.listen for Stability)
 #!/usr/bin/env python3
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.filters import command, regex, user
-from pyrogram.types import Message
-from asyncio import create_task, wait_for, Event
+from pyrogram.errors import Timeout
+from asyncio import sleep
 from aiofiles.os import path as aiopath
 from yt_dlp import YoutubeDL
 from functools import partial
@@ -35,67 +35,17 @@ from bot.helper.ext_utils.help_messages import YT_HELP_MESSAGE
 # --- CUSTOM FOLDER ID ---
 VIDEO_FOLDER_ID = '1tKXmbfClZlpFi3NhXvM0aY2fJLk4Aw5R'
 
-@new_task
-async def select_format(_, query, obj):
-    data = query.data.split()
-    message = query.message
-    await query.answer()
-
-    if data[1] == "dict":
-        b_name = data[2]
-        await obj.qual_subbuttons(b_name)
-    elif data[1] == "mp3":
-        await obj.mp3_subbuttons()
-    elif data[1] == "back":
-        await obj.back_to_main()
-    elif data[1] == "cancel":
-        await editMessage(message, "Task has been cancelled.")
-        obj.qual = None
-        obj.is_cancelled = True
-        obj.event.set()
-    else:
-        if data[1] == "sub":
-            obj.qual = obj.formats[data[2]][data[3]][1]
-        elif "|" in data[1]:
-            obj.qual = obj.formats[data[1]]
-        else:
-            obj.qual = data[1]
-        obj.event.set()
-
-
 class YtSelection:
     def __init__(self, client, message):
         self.__message = message
         self.__user_id = message.from_user.id
         self.__client = client
-        self.__reply_to = None
-        self.__time = time()
-        self.__timeout = 120
-        self.is_cancelled = False
-        self.__main_buttons = None
-        self.event = Event()
-        self.formats = {}
         self.qual = None
-
-    async def __event_handler(self):
-        pfunc = partial(select_format, obj=self)
-        handler = self.__client.add_handler(
-            CallbackQueryHandler(pfunc, filters=regex("^ytq") & user(self.__user_id)),
-            group=-1,
-        )
-        try:
-            await wait_for(self.event.wait(), timeout=self.__timeout)
-        except Exception:
-            await editMessage(self.__reply_to, "Timed Out. Task has been cancelled!")
-            self.qual = None
-            self.is_cancelled = True
-            self.event.set()
-        finally:
-            self.__client.remove_handler(*handler)
+        self.is_cancelled = False
 
     async def get_quality(self, result):
-        future = create_task(self.__event_handler())
         buttons = ButtonMaker()
+        formats = {}
         
         format_dict = result.get("formats")
         if format_dict is not None:
@@ -115,28 +65,41 @@ class YtSelection:
                         v_format = f"{format_id}+ba/b[height=?{height}]"
                     else:
                         continue
+                    
+                    # Use a simple key for callback data
+                    key = f"ytq {v_format}" 
+                    formats[key] = v_format
+                    buttons.ibutton(f"{b_name} ({get_readable_file_size(size)})", key)
 
-                    self.formats.setdefault(b_name, {})[f"{item['tbr']}"] = [size, v_format]
-
-            for b_name, tbr_dict in self.formats.items():
-                if len(tbr_dict) == 1:
-                    tbr, v_list = next(iter(tbr_dict.items()))
-                    buttonName = f"{b_name} ({get_readable_file_size(v_list[0])})"
-                    buttons.ibutton(buttonName, f"ytq sub {b_name} {tbr}")
-                else:
-                    buttons.ibutton(b_name, f"ytq dict {b_name}")
-            
-            buttons.ibutton("MP3", "ytq mp3")
-            buttons.ibutton("Best Video", "ytq bv*+ba/b")
-            buttons.ibutton("Best Audio", "ytq ba/b")
-            buttons.ibutton("Cancel", "ytq cancel", "footer")
-            self.__main_buttons = buttons.build_menu(2)
-            msg = f"Choose Video Quality:\nTimeout: {get_readable_time(self.__timeout-(time()-self.__time))}"
+        buttons.ibutton("Best Video", "ytq bv*+ba/b")
+        buttons.ibutton("Best Audio", "ytq ba/b")
+        buttons.ibutton("Cancel", "ytq cancel", "footer")
         
-        self.__reply_to = await sendMessage(self.__message, msg, self.__main_buttons)
-        await future
-        if not self.is_cancelled:
-            await deleteMessage(self.__reply_to)
+        main_buttons = buttons.build_menu(2)
+        msg = f"Choose Video Quality:\nTimeout: 2 minutes"
+        reply_message = await sendMessage(self.__message, msg, main_buttons)
+        
+        try:
+            # Use client.listen for robust callback handling
+            cb = await self.__client.listen(
+                user_id=self.__user_id, 
+                chat_id=self.__message.chat.id, 
+                message_id=reply_message.id,
+                timeout=120
+            )
+            data = cb.data.split(maxsplit=1)
+            if data[0] == "ytq":
+                if data[1] == "cancel":
+                    self.is_cancelled = True
+                    await editMessage(reply_message, "Task has been cancelled.")
+                else:
+                    self.qual = data[1]
+            await cb.answer() # Acknowledge the button press
+        except Timeout:
+            self.is_cancelled = True
+            await editMessage(reply_message, "Timed Out. Task has been cancelled!")
+        
+        await deleteMessage(reply_message)
         return self.qual
 
 def extract_info(link, options):
@@ -151,10 +114,9 @@ async def _ytdl(client, message, isLeech=False):
     text = message.text.split("\n")
     input_list = text[0].split(" ")
     
-    arg_base = {"link": "", "-n": "", "-name": "", "-s": False, "-select": False}
+    arg_base = {"link": "", "-n": "", "-name": ""}
     args = arg_parser(input_list[1:], arg_base)
     name = args["-n"] or args["-name"]
-    select = args["-s"] or args["-select"]
     link = args["link"]
 
     if not link and (reply_to := message.reply_to_message) and reply_to.text:
@@ -163,20 +125,15 @@ async def _ytdl(client, message, isLeech=False):
     if not is_url(link):
         return await sendMessage(message, YT_HELP_MESSAGE[0])
 
-    if (sender_chat := message.sender_chat):
-        tag = sender_chat.title
-    else:
-        tag = message.from_user.mention
+    tag = message.from_user.mention
 
     # --- Destination Logic ---
     if isLeech:
         up = "leech"
         drive_id = ""
-        index_link = ""
     else: # This is /ytdl (mirror)
         up = "gd"
         drive_id = VIDEO_FOLDER_ID
-        index_link = config_dict.get("INDEX_URL", "")
     
     listener = MirrorLeechListener(message, isLeech=isLeech, tag=tag, drive_id=drive_id, upPath=up, isYtdlp=True, source_url=link)
 
@@ -187,13 +144,13 @@ async def _ytdl(client, message, isLeech=False):
     except Exception as e:
         return await sendMessage(message, f"{tag} {str(e).replace('<', ' ').replace('>', ' ')}")
     
-    # --- Quality Selection Logic (ALWAYS ON) ---
-    qual = ""
-    if not select:
-        qual = await YtSelection(client, message).get_quality(result)
-        if qual is None:
-            return
-            
+    # --- Quality Selection Logic ---
+    yt_selector = YtSelection(client, message)
+    qual = await yt_selector.get_quality(result)
+    
+    if yt_selector.is_cancelled or not qual:
+        return
+
     await delete_links(message)
     LOGGER.info(f"Downloading with YT-DLP: {link} | Quality: {qual}")
     path = f"{DOWNLOAD_DIR}{listener.uid}"
