@@ -12,7 +12,7 @@ from bot.helper.ext_utils.fs_utils import get_mime_type
 from bot.helper.mirror_utils.status_utils.gdrive_status import GdriveStatus
 from bot.helper.mirror_utils.status_utils.telegram_status import TelegramStatus
 from bot.helper.mirror_utils.status_utils.aria2_status import Aria2Status
-from bot.helper.mirror_utils.download_utils.aria2_download import Aria2DownloadHelper
+from bot.helper.mirror_utils.download_utils.aria2_download import Aria2Download
 from bot.helper.mirror_utils.download_utils.telegram_downloader import TelegramDownloader
 from bot.helper.mirror_utils.download_utils.direct_link_generator import direct_link_generator
 from bot.helper.mirror_utils.download_utils.mega_download import MegaDownloader
@@ -61,16 +61,25 @@ async def wzmlxcb(message, client):
         destination = config_dict['GDRIVE_ID']
         await sendMessage(message, f"✅ Oke! File akan di-mirror ke folder default.")
 
+    listener = MirrorLeechListener(
+        message,
+        isLeech=False,
+        tag=tag,
+        drive_id=destination,
+        index_link=config_dict['INDEX_URL'],
+        source_url=url if url else message.link
+    )
+
     if reply_to and reply_to.media:
-        downloader = TelegramDownloader(reply_to, user_id, message, destination)
+        downloader = TelegramDownloader(reply_to, user_id, listener, destination)
         tg_status = TelegramStatus(downloader, None, message, None, "dl", {})
         await downloader.download()
     elif url:
         if is_gdrive_link(url):
-            drive = GoogleDriveHelper(None, None, message)
+            drive = GoogleDriveHelper(None, listener, message)
             await sync_to_async(drive.upload, url, destination)
         elif is_mega_link(url):
-            mega_dl = MegaDownloader(url, message)
+            mega_dl = MegaDownloader(url, listener)
             await mega_dl.add_download(destination, None)
         else:
             try:
@@ -91,7 +100,7 @@ async def wzmlxcb(message, client):
 
             try:
                 link = await direct_link_generator(url)
-                downloader = DirectDownloader(link, file_name, message, destination)
+                downloader = DirectDownloader(link, file_name, listener, destination)
                 aria2_status = Aria2Status(downloader, None, message, None, {})
                 await downloader.start_download()
             except DirectDownloadLinkException as e:
