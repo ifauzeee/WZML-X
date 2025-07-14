@@ -201,7 +201,144 @@ async def _mirror_leech(
             msg[index + 1] = f"{multi - 1}"
             nextmsg = await client.get_messages(chat_id=message.chat.id, message_ids=message.reply_to_message_id + 1)
             nextmsg = await sendMessage(nextmsg, " ".join(msg))
-        nextmsg = await client.get_messageshydes(client, message: Message, isQbit=False, isLeech=False):
+        nextmsg = await client.get_messages(chat_id=message.chat.id, message_ids=nextmsg.id)
+        if folder_name:
+            sameDir["tasks"].add(nextmsg.id)
+        nextmsg.from_user = message.from_user
+        await sleep(5)
+        _mirror_leech(client, nextmsg, isQbit, isLeech, sameDir, bulk)
+
+    __run_multi()
+
+    path = f"{DOWNLOAD_DIR}{message.id}{folder_name}"
+    
+    sender_chat = message.sender_chat
+    if sender_chat:
+        tag = sender_chat.title
+    else:
+        tag = message.from_user.mention
+    
+    reply_to = message.reply_to_message
+    if not link and reply_to:
+        if reply_to.text:
+            link = reply_to.text.split("\n", 1)[0].strip()
+            
+    if link and is_telegram_link(link):
+        try:
+            reply_to, session = await get_tg_link_content(link, message.from_user.id)
+            decrypter = get_decrypt_key() if session else None
+        except Exception as e:
+            await sendMessage(message, f"ERROR: {e}")
+            return
+
+    if reply_to:
+        file_ = getattr(reply_to, reply_to.media.value) if reply_to.media else None
+        if file_ is None and reply_to.text:
+            reply_text = reply_to.text.split("\n", 1)[0].strip()
+            if is_url(reply_text) or is_magnet(reply_text):
+                link = reply_text
+        elif reply_to.document and (file_.mime_type == "application/x-bittorrent" or file_.file_name.endswith(".torrent")):
+            link = await reply_to.download()
+            file_ = None
+
+    if (not is_url(link) and not is_magnet(link) and not await aiopath.exists(link) and not is_rclone_path(link) and file_ is None):
+        await sendMessage(message, MIRROR_HELP_MESSAGE[0])
+        return
+
+    error_msg = []
+    error_button = None
+    task_utilis_msg, error_button = await task_utils(message)
+    if error_msg:
+        error_msg.extend(task_utilis_msg)
+
+    if error_msg:
+        final_msg = f"Hey {tag},\n"
+        for __i, __msg in enumerate(error_msg, 1):
+            final_msg += f"\n<b>{__i}</b>: {__msg}\n"
+        if error_button is not None:
+            error_button = error_button.build_menu(2)
+        await sendMessage(message, final_msg, error_button)
+        return
+
+    org_link = link
+    if link:
+        LOGGER.info(link)
+
+    if not isLeech:
+        if custom_upload_path:
+            drive_id = custom_upload_path
+            up = 'gd'
+        if not up:
+            if config_dict["DEFAULT_UPLOAD"] == "rc":
+                up = config_dict.get("RCLONE_PATH", "")
+            else:
+                up = "gd"
+        if up == "gd" and not drive_id and not config_dict.get("GDRIVE_ID"):
+             await sendMessage(message, "GDRIVE_ID not Provided!")
+             return
+        if up == "gd" and drive_id and not await sync_to_async(GoogleDriveHelper().getFolderData, drive_id):
+            return await sendMessage(message, "Google Drive ID validation failed!!")
+        if not up:
+            await sendMessage(message, "No Upload Destination specified!")
+            return
+        if up != 'gd' and not is_rclone_path(up):
+            await sendMessage(message, f"Wrong Rclone Upload Destination: {up}")
+            return
+    else:
+        up = 'leech'
+
+    listener = MirrorLeechListener(message, compress, extract, isQbit, isLeech, tag, select, seed, sameDir, rcf, up, join, drive_id=drive_id, index_link=index_link, source_url=org_link, leech_utils={"screenshots": sshots, "thumb": thumb})
+
+    if file_ is not None:
+        try:
+            await TelegramDownloadHelper(listener).add_download(reply_to, f"{path}/", name, session, decrypter)
+        except Exception as e:
+            LOGGER.error(f"Failed to start Telegram download: {e}")
+            await sendMessage(message, "Gagal memulai unduhan file Telegram. Silakan periksa log untuk detail.")
+            return
+    elif is_rclone_path(link):
+        await add_rclone_download(link, config_dict.get("RCLONE_CONFIG"), f"{path}/", name, listener)
+    elif is_gdrive_link(link):
+        await add_gd_download(link, path, listener, name)
+    elif is_mega_link(link):
+        await add_mega_download(link, f"{path}/", listener, name)
+    elif isQbit:
+        await add_qb_torrent(link, path, listener, ratio, seed_time)
+    else:
+        headers = ""
+        if ussr or pssw:
+            auth = f"{ussr}:{pssw}"
+            headers = f"authorization: Basic {b64encode(auth.encode()).decode('ascii')}"
+        await add_aria2c_download(link, path, listener, name, headers, ratio, seed_time)
+
+# --- START OF CUSTOM CATEGORY LOGIC ---
+
+def get_file_category(link, reply_to_message):
+    media = reply_to_message
+    if media:
+        if media.video: return 'video'
+        if media.audio or media.voice: return 'audio'
+        if media.document:
+            mime_type = media.document.mime_type or ""
+            file_name = media.document.file_name or ""
+            if mime_type == 'application/vnd.android.package-archive' or file_name.lower().endswith('.apk'):
+                return 'app'
+            if 'zip' in mime_type or 'rar' in mime_type or file_name.lower().endswith('.7z'):
+                return 'folder'
+            if any(x in mime_type for x in ['pdf', 'word', 'powerpoint', 'excel']):
+                return 'files'
+    
+    link_lower = link.lower() if link else ""
+    if is_magnet(link_lower): return 'folder'
+    if '.apk' in link_lower: return 'app'
+    if any(ext in link_lower for ext in ['.mp4', '.mkv', '.webm', '.flv', '.mov']): return 'video'
+    if any(ext in link_lower for ext in ['.mp3', '.flac', '.wav', '.m4a']): return 'audio'
+    if any(ext in link_lower for ext in ['.zip', '.rar', '.7z']): return 'folder'
+    if any(ext in link_lower for ext in ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx']): return 'files'
+    
+    return 'files'
+
+async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech=False):
     text_args = message.text.split()
     if any(arg in ['-s', '-select', '-up', '-samedir', '-sd', '-m'] for arg in text_args):
         await _mirror_leech(client, message, isQbit, isLeech)
@@ -231,6 +368,112 @@ async def _mirror_leech(
 
         await sendMessage(message, f"✅ Oke! File akan di-mirror ke folder {CATEGORY_DISPLAY_NAMES[category]}.")
         await _mirror_leech(client, message, isQbit=isQbit, isLeech=isLeech, custom_upload_path=up_path)
+
+async def wzmlxcb(_, query):
+    message = query.message
+    user_id = query.from_user.id
+    data = query.data.split()
+    if user_id != int(data[1]):
+        return await query.answer(text="Not Yours!", show_alert=True)
+    elif data[2] == "logdisplay":
+        await query.answer()
+        async with aiopen("log.txt", "r") as f:
+            logFileLines = (await f.read()).splitlines()
+        def parseline(line):
+            try:
+                return "[" + line.split("] [", 1)[1]
+            except IndexError:
+                return line
+        ind, Loglines = 1, ""
+        try:
+            while len(Loglines) <= 3500:
+                Loglines = parseline(logFileLines[-ind]) + "\n" + Loglines
+                if ind == len(logFileLines):
+                    break
+                ind += 1
+            startLine = f"<b>Showing Last {ind} Lines from log.txt:</b> \n\n----------<b>START LOG</b>----------\n\n"
+            endLine = "\n----------<b>END LOG</b>----------"
+            btn = ButtonMaker()
+            btn.ibutton("Cʟᴏsᴇ", f"wzmlx {user_id} close")
+            await sendMessage(
+                message, startLine + escape(Loglines) + endLine, btn.build_menu(1)
+            )
+            await editReplyMarkup(message, None)
+        except Exception as err:
+            LOGGER.error(f"TG Log Display : {str(err)}")
+    elif data[2] == "webpaste":
+        await query.answer()
+        async with aiopen("log.txt", "r") as f:
+            logFile = await f.read()
+        cget = create_scraper().request
+        resp = cget(
+            "POST",
+            "https://spaceb.in/api/v1/documents",
+            data={"content": logFile, "extension": "None"},
+        ).json()
+        if resp["status"] == 201:
+            btn = ButtonMaker()
+            btn.ubutton(
+                "📨 Web Paste (SB)", f"https://spaceb.in/{resp['payload']['id']}"
+            )
+            await editReplyMarkup(message, btn.build_menu(1))
+        else:
+            LOGGER.error(f"Web Paste Failed : {str(err)}")
+    elif data[2] == "botpm":
+        await query.answer(url=f"https://t.me/{bot_name}?start=wzmlx")
+    elif data[2] == "help":
+        await query.answer()
+        btn = ButtonMaker()
+        btn.ibutton("Cʟᴏsᴇ", f"wzmlx {user_id} close")
+        if data[3] == "CLONE":
+            await editMessage(message, CLONE_HELP_MESSAGE[1], btn.build_menu(1))
+        elif data[3] == "MIRROR":
+            if len(data) == 4:
+                msg = MIRROR_HELP_MESSAGE[1][:4000]
+                btn.ibutton("Nᴇxᴛ Pᴀɢᴇ", f"wzmlx {user_id} help MIRROR readmore")
+            else:
+                msg = MIRROR_HELP_MESSAGE[1][4000:]
+                btn.ibutton("Pʀᴇ Pᴀɢᴇ", f"wzmlx {user_id} help MIRROR")
+            await editMessage(message, msg, btn.build_menu(2))
+        if data[3] == "YT":
+            await editMessage(message, YT_HELP_MESSAGE[1], btn.build_menu(1))
+    elif data[2] == "guide":
+        btn = ButtonMaker()
+        btn.ibutton("Bᴀᴄᴋ", f"wzmlx {user_id} guide home")
+        btn.ibutton("Cʟᴏsᴇ", f"wzmlx {user_id} close")
+        if data[3] == "basic":
+            await editMessage(message, help_string[0], btn.build_menu(2))
+        elif data[3] == "users":
+            await editMessage(message, help_string[1], btn.build_menu(2))
+        elif data[3] == "miscs":
+            await editMessage(message, help_string[3], btn.build_menu(2))
+        elif data[3] == "admin":
+            if not await CustomFilters.sudo("", query):
+                return await query.answer("Not Sudo or Owner!", show_alert=True)
+            await editMessage(message, help_string[2], btn.build_menu(2))
+        else:
+            buttons = ButtonMaker()
+            buttons.ibutton("Basic", f"wzmlx {user_id} guide basic")
+            buttons.ibutton("Users", f"wzmlx {user_id} guide users")
+            buttons.ibutton("Mics", f"wzmlx {user_id} guide miscs")
+            buttons.ibutton("Owner & Sudos", f"wzmlx {user_id} guide admin")
+            buttons.ibutton("Close", f"wzmlx {user_id} close")
+            await editMessage(
+                message,
+                "㊂ <b><i>Help Guide Menu!</i></b>\n\n<b>NOTE: <i>Click on any CMD to see more minor detalis.</i></b>",
+                buttons.build_menu(2),
+            )
+        await query.answer()
+    elif data[2] == "stats":
+        msg, btn = await get_stats(query, data[3])
+        await editMessage(message, msg, btn, "IMAGES")
+    else:
+        await query.answer()
+        await deleteMessage(message)
+        if message.reply_to_message:
+            await deleteMessage(message.reply_to_message)
+            if message.reply_to_message.reply_to_message:
+                await deleteMessage(message.reply_to_message.reply_to_message)
 
 async def mirror(client, message):
     await run_mirror_leech_entry(client, message)
