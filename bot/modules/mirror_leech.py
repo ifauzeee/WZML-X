@@ -1,4 +1,4 @@
-# FINAL MERGED AND CORRECTED CODE (V7) zee
+# FINAL MERGED AND CORRECTED CODE FOR mirror_leech.py
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.types import Message
 from pyrogram.filters import command, regex
@@ -85,6 +85,7 @@ CUSTOM_DESTINATIONS = {
     'folder':    '1E9Ng9uMqJ2yAK8hqirp7EOImSGgKecW6',
 }
 
+
 @new_task
 async def _mirror_leech(
     client, message, isQbit=False, isLeech=False, sameDir=None, bulk=[], custom_upload_path=None
@@ -133,7 +134,7 @@ async def _mirror_leech(
     reply_to = None
     file_ = None
     session = ""
-
+        
     if not isinstance(seed, bool):
         dargs = seed.split(":")
         ratio = dargs[0] or None
