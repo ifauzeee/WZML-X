@@ -1,3 +1,4 @@
+# FINAL AUTOMATED YTDL CODE (V13 - Fixed Stuck Button)
 #!/usr/bin/env python3
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.filters import command, regex, user
@@ -29,7 +30,6 @@ from bot.helper.ext_utils.bot_utils import (
     new_task,
     sync_to_async,
     is_rclone_path,
-    new_thread,
     get_readable_time,
     arg_parser,
 )
@@ -94,7 +94,7 @@ class YtSelection:
         self.formats = {}
         self.qual = None
 
-    @new_thread
+    @new_task # <--- THIS IS THE FIX. Changed from @new_thread
     async def __event_handler(self):
         pfunc = partial(select_format, obj=self)
         handler = self.__client.add_handler(
