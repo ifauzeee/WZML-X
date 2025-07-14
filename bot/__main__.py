@@ -369,7 +369,7 @@ async def main():
     
     # Add remaining handlers from the .BAK file
     bot.add_handler(MessageHandler(clone.clone, filters=command(BotCommands.CloneCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(gd_list.glist, filters=command(BotCommands.ListCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(gd_list.list_search, filters=command(BotCommands.ListCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(cancel_mirror.cancel_mirror, filters=command(BotCommands.CancelMirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(cancel_mirror.cancel_all, filters=command(BotCommands.CancelAllCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(status.mirror_status, filters=command(BotCommands.StatusCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
