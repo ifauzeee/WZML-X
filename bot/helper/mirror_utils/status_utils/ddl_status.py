@@ -13,6 +13,7 @@ class DDLStatus:
         self.__size = size
         self.__gid = gid
         self.listener = listener
+        self.message = listener.message # <-- BARIS INI DITAMBAHKAN KEMBALI
 
     def progress_bar(self):
         return get_progress_bar_string(self)
@@ -27,6 +28,7 @@ class DDLStatus:
         return get_readable_file_size(self.__size)
 
     def status(self):
+        # DDLStatus dalam bot ini tampaknya hanya untuk upload, jadi kita set UPLOADING
         return MirrorStatus.STATUS_UPLOADING
 
     def name(self):
