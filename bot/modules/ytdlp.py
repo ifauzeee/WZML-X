@@ -1,11 +1,9 @@
-# FINAL YTDLP CODE (V19 - New Categories)
+# FINAL YTDLP CODE (V20 - Total Bug Fix for Callback and Options)
 #!/usr/bin/env python3
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.filters import command, regex, user
-from asyncio import create_task, wait_for, Event
-from aiofiles.os import path as aiopath
+from asyncio import Event, wait_for
 from yt_dlp import YoutubeDL
-from functools import partial
 from time import time
 
 from bot import DOWNLOAD_DIR, bot, user_data, config_dict, LOGGER
@@ -18,20 +16,16 @@ from bot.helper.telegram_helper.filters import CustomFilters
 from bot.helper.listeners.tasks_listener import MirrorLeechListener
 from bot.helper.ext_utils.help_messages import YT_HELP_MESSAGE
 
-# --- NEW CUSTOM VIDEO FOLDER ID ---
+# --- GANTI DENGAN ID FOLDER GOOGLE DRIVE ANDA ---
 VIDEO_FOLDER_ID = '1tKXmbfClZlpFi3NhXvM0aY2fJLk4Aw5R'
 
 # Dictionary to store user's quality selection event
 yt_events = {}
 
 class YtSelection:
-    def __init__(self, message, client):
+    def __init__(self, message):
         self.__message = message
         self.__user_id = message.from_user.id
-        self.__client = client
-        self.qual = None
-        self.is_cancelled = False
-        self.__reply_to = None
 
     async def get_quality(self, result):
         if self.__user_id in yt_events:
@@ -48,6 +42,7 @@ class YtSelection:
                 if item.get("tbr"):
                     format_id = item["format_id"]
                     size = item.get("filesize") or item.get("filesize_approx") or 0
+
                     if item.get("video_ext") == "none" and item.get("acodec") != "none":
                         b_name = f"{item['acodec']}-{item['ext']}"
                         v_format = format_id
@@ -69,15 +64,15 @@ class YtSelection:
         
         main_buttons = buttons.build_menu(2)
         msg = f"Choose Video Quality:\nTimeout: 2 minutes"
-        self.__reply_to = await sendMessage(self.__message, msg, main_buttons)
+        reply_message = await sendMessage(self.__message, msg, main_buttons)
 
         try:
             await wait_for(yt_events[self.__user_id]['event'].wait(), timeout=120)
         except Exception:
             yt_events[self.__user_id]['is_cancelled'] = True
-            await editMessage(self.__reply_to, "Timed Out. Task has been cancelled!")
+            await editMessage(reply_message, "Timed Out. Task has been cancelled!")
         
-        await deleteMessage(self.__reply_to)
+        await deleteMessage(reply_message)
         
         is_cancelled = yt_events[self.__user_id]['is_cancelled']
         qual = yt_events[self.__user_id]['qual']
@@ -86,7 +81,7 @@ class YtSelection:
         
         return qual, is_cancelled
 
-@bot.on_callback_query(regex(r"^ytq"))
+@bot.on_callback_query(regex("^ytq"))
 async def yt_qual_callback(_, query):
     user_id = query.from_user.id
     data = query.data.split(maxsplit=2)
@@ -119,11 +114,14 @@ def extract_info(link, options):
 
 @new_task
 async def _ytdl(client, message, isLeech=False):
-    input_list = message.text.split(" ")
-    arg_base = {"link": "", "-n": "", "-name": "", "-s": False, "-select": False}
+    text = message.text.split("\n")
+    input_list = text[0].split(" ")
+    
+    arg_base = {"link": "", "-n": "", "-name": "", "-opt": ""}
     args = arg_parser(input_list[1:], arg_base)
     name = args["-n"] or args["-name"]
     link = args["link"]
+    opt = args["-opt"]
 
     if not link and (reply_to := message.reply_to_message) and reply_to.text:
         link = reply_to.text.split("\n", 1)[0].strip()
@@ -142,14 +140,25 @@ async def _ytdl(client, message, isLeech=False):
     
     listener = MirrorLeechListener(message, isLeech=isLeech, tag=tag, drive_id=drive_id, upPath=up, isYtdlp=True, source_url=link)
 
-    options = {"usenetrc": True, "cookiefile": "cookies.txt", "playlist_items": "0"}
+    user_id = message.from_user.id
+    user_dict = user_data.get(user_id, {})
+    yt_opt = opt or user_dict.get("yt_opt") or config_dict.get("YT_DLP_OPTIONS")
     
+    options = {"usenetrc": True, "cookiefile": "cookies.txt", "playlist_items": "0"}
+    if yt_opt:
+        yt_opts = yt_opt.split("|")
+        for opt_item in yt_opts:
+            key, value = map(str.strip, opt_item.split(":", 1))
+            if value.lower() == 'true': value = True
+            elif value.lower() == 'false': value = False
+            options[key] = value
+            
     try:
         result = await sync_to_async(extract_info, link, options)
     except Exception as e:
         return await sendMessage(message, f"{tag} {str(e).replace('<', ' ').replace('>', ' ')}")
     
-    yt_selector = YtSelection(message, client)
+    yt_selector = YtSelection(message)
     qual, is_cancelled = await yt_selector.get_quality(result)
     
     if is_cancelled or not qual:
@@ -160,7 +169,8 @@ async def _ytdl(client, message, isLeech=False):
     path = f"{DOWNLOAD_DIR}{listener.uid}"
     playlist = "entries" in result
     ydl = YoutubeDLHelper(listener)
-    await ydl.add_download(link, path, name, qual, playlist, options)
+    # FIX: Pass yt_opt (string) not options (dict)
+    await ydl.add_download(link, path, name, qual, playlist, yt_opt)
 
 async def ytdl(client, message):
     await _ytdl(client, message)
