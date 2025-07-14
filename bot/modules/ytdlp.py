@@ -1,7 +1,8 @@
-# FINAL YTDLP CODE (V16 - Auto Mirror, Manual Leech)
+# FINAL YTDLP CODE (V17 - Manual Quality, Auto Destination for Mirror)
 #!/usr/bin/env python3
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.filters import command, regex, user
+from pyrogram.types import Message
 from asyncio import create_task, wait_for, Event
 from aiofiles.os import path as aiopath
 from yt_dlp import YoutubeDL
@@ -32,7 +33,7 @@ from bot.helper.listeners.tasks_listener import MirrorLeechListener
 from bot.helper.ext_utils.help_messages import YT_HELP_MESSAGE
 
 # --- CUSTOM FOLDER ID ---
-VIDEO_FOLDER_ID = '1tKXmbfClZlpFi3NhXvM0aY2fJLk4Aw5R' # Ganti dengan ID folder Google Drive Anda
+VIDEO_FOLDER_ID = '1tKXmbfClZlpFi3NhXvM0aY2fJLk4Aw5R'
 
 @new_task
 async def select_format(_, query, obj):
@@ -150,9 +151,10 @@ async def _ytdl(client, message, isLeech=False):
     text = message.text.split("\n")
     input_list = text[0].split(" ")
     
-    arg_base = {"link": "", "-n": "", "-name": ""}
+    arg_base = {"link": "", "-n": "", "-name": "", "-s": False, "-select": False}
     args = arg_parser(input_list[1:], arg_base)
     name = args["-n"] or args["-name"]
+    select = args["-s"] or args["-select"]
     link = args["link"]
 
     if not link and (reply_to := message.reply_to_message) and reply_to.text:
@@ -166,9 +168,17 @@ async def _ytdl(client, message, isLeech=False):
     else:
         tag = message.from_user.mention
 
-    drive_id = VIDEO_FOLDER_ID if not isLeech else ""
+    # --- Destination Logic ---
+    if isLeech:
+        up = "leech"
+        drive_id = ""
+        index_link = ""
+    else: # This is /ytdl (mirror)
+        up = "gd"
+        drive_id = VIDEO_FOLDER_ID
+        index_link = config_dict.get("INDEX_URL", "")
     
-    listener = MirrorLeechListener(message, isLeech=isLeech, tag=tag, drive_id=drive_id, isYtdlp=True, source_url=link)
+    listener = MirrorLeechListener(message, isLeech=isLeech, tag=tag, drive_id=drive_id, upPath=up, isYtdlp=True, source_url=link)
 
     options = {"usenetrc": True, "cookiefile": "cookies.txt", "playlist_items": "0"}
     
@@ -176,21 +186,20 @@ async def _ytdl(client, message, isLeech=False):
         result = await sync_to_async(extract_info, link, options)
     except Exception as e:
         return await sendMessage(message, f"{tag} {str(e).replace('<', ' ').replace('>', ' ')}")
-
+    
+    # --- Quality Selection Logic (ALWAYS ON) ---
     qual = ""
-    if isLeech:
+    if not select:
         qual = await YtSelection(client, message).get_quality(result)
-        if qual is None: return
-    else:
-        qual = "bestvideo+bestaudio/best"
-        await sendMessage(message, f"✅ Oke! File akan di-mirror ke folder **VIDEO**.")
+        if qual is None:
+            return
             
     await delete_links(message)
     LOGGER.info(f"Downloading with YT-DLP: {link} | Quality: {qual}")
     path = f"{DOWNLOAD_DIR}{listener.uid}"
     playlist = "entries" in result
     ydl = YoutubeDLHelper(listener)
-    await ydl.add_download(link, path, name, qual, playlist, config_dict.get("YT_DLP_OPTIONS"))
+    await ydl.add_download(link, path, name, qual, playlist, options)
 
 async def ytdl(client, message):
     await _ytdl(client, message)
