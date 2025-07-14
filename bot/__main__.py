@@ -1,4 +1,4 @@
-# THIS IS THE FINAL AND CORRECTED __main__.py FILE BASED ON YOUR .BAK
+# FINAL CORRECTED CODE FOR __main__.py zee
 from time import time, monotonic
 from datetime import datetime
 from sys import executable
@@ -59,8 +59,6 @@ from .helper.telegram_helper.filters import CustomFilters
 from .helper.telegram_helper.button_build import ButtonMaker
 from .helper.listeners.aria2_listener import start_aria2_listener
 from .helper.themes import BotTheme
-
-# We import the original modules
 from .modules import (
     authorize,
     clone,
@@ -89,7 +87,6 @@ from .modules import (
     gd_clean,
     broadcast,
 )
-# We add ONLY the necessary new imports from our modified module
 from .modules.mirror_leech import mirror_leech_callback, wzmlxcb
 
 
@@ -346,7 +343,7 @@ async def main():
     )
     await sync_to_async(start_aria2_listener, wait=False)
 
-    # Add all handlers from the original file
+    # Add all original handlers
     bot.add_handler(MessageHandler(start, filters=command(BotCommands.StartCommand)))
     bot.add_handler(CallbackQueryHandler(token_callback, filters=regex(r"^pass")))
     bot.add_handler(MessageHandler(login, filters=command(BotCommands.LoginCommand) & private))
@@ -362,12 +359,34 @@ async def main():
     # Add other original callbacks
     bot.add_handler(CallbackQueryHandler(wzmlxcb, filters=regex(r"^wzmlx")))
     
-    # Add original command handlers
+    # Add all original command handlers
     bot.add_handler(MessageHandler(mirror_leech.mirror, filters=command(BotCommands.MirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(mirror_leech.qb_mirror, filters=command(BotCommands.QbMirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(ytdlp.ytdl, filters=command(BotCommands.YtdlCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(mirror_leech.leech, filters=command(BotCommands.LeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(mirror_leech.qb_leech, filters=command(BotCommands.QbLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(ytdlp.ytdl_leech, filters=command(BotCommands.YtdlLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     
+    # Add remaining handlers from the .BAK file
+    bot.add_handler(MessageHandler(clone.clone, filters=command(BotCommands.CloneCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(gd_list.list_search, filters=command(BotCommands.ListCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(cancel_mirror.cancel_mirror, filters=command(BotCommands.CancelMirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(cancel_mirror.cancel_all, filters=command(BotCommands.CancelAllCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(status.mirror_status, filters=command(BotCommands.StatusCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(gd_delete.deletefile, filters=command(BotCommands.DeleteCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(gd_count.count, filters=command(BotCommands.CountCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(torrent_select.select_torrent, filters=command(BotCommands.BtSelectCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(torrent_search.torrent_search, filters=command(BotCommands.SearchCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(bot_settings.bot_settings, filters=command(BotCommands.BotSetCommand) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(users_settings.user_settings, filters=command(BotCommands.UserSetCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(shell.shell, filters=command(BotCommands.ShellCommand) & CustomFilters.owner_filter))
+    bot.add_handler(MessageHandler(eval.eval, filters=command(BotCommands.EvalCommand) & CustomFilters.owner_filter))
+    bot.add_handler(MessageHandler(speedtest.speedtest, filters=command(BotCommands.SpeedCommand) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(save_msg.save_message, filters=command(BotCommands.SaveMsgCommand) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(gen_pyro_sess.get_session, filters=command(BotCommands.GetSession) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(gd_clean.gdclean, filters=command(BotCommands.GdClean) & CustomFilters.sudo))
+    bot.add_handler(MessageHandler(broadcast.broadcast_message, filters=command(BotCommands.BroadcastCommand) & CustomFilters.sudo))
+
     LOGGER.info(f"WZML-X Bot [@{bot_name}] Started!")
     if user:
         LOGGER.info(f"WZ's User [@{user.me.username}] Ready!")
