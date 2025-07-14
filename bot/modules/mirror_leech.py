@@ -1,4 +1,4 @@
-# FINAL MERGED AND CORRECTED CODE (V9)
+# FINAL MERGED AND CORRECTED CODE (V8)
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.types import Message
 from pyrogram.filters import command, regex
@@ -279,7 +279,6 @@ async def _mirror_leech(
             return
     else:
         up = 'leech'
-
 
     listener = MirrorLeechListener(message, compress, extract, isQbit, isLeech, tag, select, seed, sameDir, rcf, up, join, drive_id=drive_id, index_link=index_link, source_url=org_link, leech_utils={"screenshots": sshots, "thumb": thumb})
 
