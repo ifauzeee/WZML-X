@@ -1,4 +1,3 @@
-# FINAL AND CORRECTED __main__.py BASED ON YOUR .BAK
 from time import time, monotonic
 from datetime import datetime
 from sys import executable
@@ -7,6 +6,7 @@ from asyncio import create_subprocess_exec, gather
 from uuid import uuid4
 from base64 import b64decode
 from importlib import import_module, reload
+
 from requests import get as rget
 from pytz import timezone
 from bs4 import BeautifulSoup
@@ -18,6 +18,7 @@ from pyrogram.enums import ChatMemberStatus, ChatType
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.filters import command, private, regex
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
 from bot import (
     bot,
     user,
@@ -85,11 +86,11 @@ from .modules import (
     gd_clean,
     broadcast,
 )
-# We import the new callback handlers from our modified module
-from .modules.mirror_leech import mirror_leech_callback, wzmlxcb
+
 async def stats(client, message):
     msg, btns = await get_stats(message)
     await sendMessage(message, msg, btns, photo="IMAGES")
+
 @new_task
 async def start(client, message):
     buttons = ButtonMaker()
@@ -128,6 +129,7 @@ async def start(client, message):
     else:
         await sendMessage(message, BotTheme("ST_UNAUTH"), reply_markup, photo="IMAGES")
     await DbManger().update_pm_users(message.from_user.id)
+
 async def token_callback(_, query):
     user_id = query.from_user.id
     input_token = query.data.split()[1]
@@ -142,6 +144,7 @@ async def token_callback(_, query):
         0, [InlineKeyboardButton(BotTheme("ACTIVATED"), callback_data="pass activated")]
     )
     await editReplyMarkup(query.message, InlineKeyboardMarkup(kb))
+
 async def login(_, message):
     if config_dict["LOGIN_PASS"] is None:
         return
@@ -156,6 +159,7 @@ async def login(_, message):
         return await sendMessage(message, BotTheme("PASS_LOGGED"))
     else:
         await sendMessage(message, BotTheme("LOGIN_USED"))
+
 async def restart(client, message):
     restart_message = await sendMessage(message, BotTheme("RESTARTING"))
     if scheduler.running:
@@ -173,6 +177,7 @@ async def restart(client, message):
     async with aiopen(".restartmsg", "w") as f:
         await f.write(f"{restart_message.chat.id}\n{restart_message.id}\n")
     osexecl(executable, executable, "-m", "bot")
+
 async def ping(_, message):
     start_time = monotonic()
     reply = await sendMessage(message, BotTheme("PING"))
@@ -180,6 +185,7 @@ async def ping(_, message):
     await editMessage(
         reply, BotTheme("PING_VALUE", value=int((end_time - start_time) * 1000))
     )
+
 async def log(_, message):
     buttons = ButtonMaker()
     buttons.ibutton(
@@ -187,6 +193,7 @@ async def log(_, message):
     )
     buttons.ibutton(BotTheme("WEB_PASTE_BT"), f"wzmlx {message.from_user.id} webpaste")
     await sendFile(message, "log.txt", buttons=buttons.build_menu(1))
+
 async def search_images():
     if not (query_list := config_dict.get("IMG_SEARCH")):
         return
@@ -221,6 +228,7 @@ async def search_images():
             )
     except Exception as e:
         LOGGER.error(f"An error occurred: {e}")
+
 async def bot_help(client, message):
     buttons = ButtonMaker()
     user_id = message.from_user.id
@@ -230,6 +238,7 @@ async def bot_help(client, message):
     buttons.ibutton(BotTheme("O_S_BT"), f"wzmlx {user_id} guide admin")
     buttons.ibutton(BotTheme("CLOSE_BT"), f"wzmlx {user_id} close")
     await sendMessage(message, BotTheme("HELP_HEADER"), buttons.build_menu(2))
+
 async def restart_notification():
     now = datetime.now(timezone(config_dict["TIMEZONE"]))
     if await aiopath.isfile(".restartmsg"):
@@ -237,6 +246,7 @@ async def restart_notification():
             chat_id, msg_id = map(int, f)
     else:
         chat_id, msg_id = 0, 0
+
     async def send_incompelete_task_message(cid, msg):
         try:
             if msg.startswith("⌬ <b><i>Restarted Successfully!</i></b>"):
@@ -256,6 +266,7 @@ async def restart_notification():
                 )
         except Exception as e:
             LOGGER.error(e)
+
     if INCOMPLETE_TASK_NOTIFIER and DATABASE_URL:
         if notifier_dict := await DbManger().get_incomplete_tasks():
             for cid, data in notifier_dict.items():
@@ -281,6 +292,7 @@ async def restart_notification():
                             msg = ""
                 if msg:
                     await send_incompelete_task_message(cid, msg)
+
     if await aiopath.isfile(".restartmsg"):
         try:
             await bot.edit_message_text(
@@ -297,6 +309,7 @@ async def restart_notification():
         except Exception as e:
             LOGGER.error(e)
         await aioremove(".restartmsg")
+
 async def log_check():
     if LEECH_LOG_ID := config_dict.get("LEECH_LOG_ID"):
         for chat_id in LEECH_LOG_ID.split():
@@ -305,6 +318,7 @@ async def log_check():
                 LOGGER.info(f"Successfully connected to Leech Log Chat ID: {chat_id}")
             except Exception as e:
                 LOGGER.error(f"Could not connect to Leech Log Chat ID: {chat_id}. ERROR: {e}")
+
 async def main():
     await gather(
         start_cleanup(),
@@ -315,6 +329,7 @@ async def main():
         log_check(),
     )
     await sync_to_async(start_aria2_listener, wait=False)
+
     # Standard handlers from original file
     bot.add_handler(MessageHandler(start, filters=command(BotCommands.StartCommand)))
     bot.add_handler(CallbackQueryHandler(token_callback, filters=regex(r"^pass")))
@@ -325,11 +340,8 @@ async def main():
     bot.add_handler(MessageHandler(bot_help, filters=command(BotCommands.HelpCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(stats, filters=command(BotCommands.StatsCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     
-    # Custom category button handler
-    bot.add_handler(CallbackQueryHandler(mirror_leech_callback, filters=regex(r"cat_up")))
-    
     # Other callback from original file
-    bot.add_handler(CallbackQueryHandler(wzmlxcb, filters=regex(r"^wzmlx")))
+    bot.add_handler(CallbackQueryHandler(mirror_leech.wzmlxcb, filters=regex(r"^wzmlx")))
     
     # All command handlers
     bot.add_handler(MessageHandler(mirror_leech.mirror, filters=command(BotCommands.MirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
@@ -337,17 +349,19 @@ async def main():
     bot.add_handler(MessageHandler(ytdlp.ytdl, filters=command(BotCommands.YtdlCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(mirror_leech.leech, filters=command(BotCommands.LeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(mirror_leech.qb_leech, filters=command(BotCommands.QbLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(ytdlp.ytdlleech, filters=command(BotCommands.YtdlLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted)) # Corrected function name
-    
+    bot.add_handler(MessageHandler(ytdlp.ytdlleech, filters=command(BotCommands.YtdlLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+
     LOGGER.info(f"WZML-X Bot [@{bot_name}] Started!")
     if user:
         LOGGER.info(f"WZ's User [@{user.me.username}] Ready!")
     signal(SIGINT, exit_clean_up)
+
 async def stop_signals():
     if user:
         await gather(bot.stop(), user.stop())
     else:
         await bot.stop()
+
 bot.loop.run_until_complete(main())
 bot.loop.run_until_complete(idle())
 bot.loop.run_until_complete(stop_signals())
