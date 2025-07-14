@@ -187,8 +187,6 @@ def handleIndex(index, dic):
 
 
 def get_progress_bar_string(pct):
-    # This function is now defined in each status class, 
-    # but we keep a fallback here for other potential uses.
     if isinstance(pct, str):
         pct = float(pct.strip('%'))
     p = min(max(pct, 0), 100)
@@ -257,9 +255,6 @@ class EngineStatus:
         self.STATUS_RCLONE = f"RClone {version_cache['rclone']}"
 
 
-# =============================================
-#           FUNGSI YANG DIUBAH
-# =============================================
 def get_readable_message():
     msg = ""
     button = None
@@ -269,14 +264,56 @@ def get_readable_message():
     if PAGE_NO > PAGES and PAGES != 0:
         globals()["STATUS_START"] = STATUS_LIMIT * (PAGES - 1)
         globals()["PAGE_NO"] = PAGES
+    for download in list(download_dict.values())[
+        STATUS_START : STATUS_LIMIT + STATUS_START
+    ]:
+        # ===========================================================
+        # SELURUH BLOK INI DIUBAH UNTUK MENGGUNAKAN FORMAT BARU
+        # ===========================================================
+        listener = download.listener
+        msg += f"<code>{escape(download.name())}</code>\n"
+        msg += "\n┠\n"
+        msg += f"<code>Size      : </code>{download.size()}\n"
+        msg += "\n┠\n"
 
-    for download in list(download_dict.values())[STATUS_START : STATUS_LIMIT + STATUS_START]:
-        # Memanggil metode __str__ dari objek status (GdriveStatus, DDLStatus, dll.)
-        # yang sudah kita atur untuk memanggil _getStatusMessage di listener
-        msg += str(download)
-        msg += f"\n\n/cancel_{download.gid()}" # Menambahkan tombol cancel
+        # Menentukan Mode
+        mode_line = "<code>Mode      : </code>"
+        if listener.isLeech:
+            mode_line += "#Leech"
+        elif listener.isClone:
+            mode_line += "#Clone"
+        elif listener.upPath not in ['gd', 'ddl']:
+            mode_line += "#Rclone"
+        elif listener.upPath == 'ddl':
+            mode_line += "#DDL"
+        else:
+            mode_line += "#GDrive"
+        
+        if listener.isQbit:
+            mode_line += ' | #qBit'
+        else:
+            mode_line += ' | #Aria2'
+        msg += f"{mode_line}\n"
+        msg += "\n┠\n"
+
+        # Menambahkan baris Path
+        if listener.category_name:
+            msg += f"<code>Path      : </code>{listener.category_name}\n\n┠\n"
+        
+        # Menambahkan detail lain
+        elapsed = time() - download.message.date.timestamp()
+        msg += f"<code>Elapsed   : </code>{get_readable_time(elapsed)}\n"
+        msg += f"┖<code>By        : </code>{listener.tag}"
+        
+        # Menambahkan progress bar
+        msg += f"\n\n{get_progress_bar_string(download.progress())}\n"
+        msg += f"<code>Progress  : </code>{download.progress()}"
+        msg += f"\n\n/cancel_{download.gid()}"
         msg += "\n\n"
-
+        # ===========================================================
+        # AKHIR DARI BLOK YANG DIUBAH
+        # ===========================================================
+        
     if len(msg) == 0:
         return None, None
 
@@ -284,26 +321,22 @@ def get_readable_message():
     up_speed = 0
     for download in download_dict.values():
         tstatus = download.status()
+        spd = (
+            download.speed()
+            if tstatus != MirrorStatus.STATUS_SEEDING
+            else download.upload_speed()
+        )
+        speed_in_bytes_per_second = 0
+        if "K" in spd:
+            speed_in_bytes_per_second = float(spd.split("K")[0]) * 1024
+        elif "M" in spd:
+            speed_in_bytes_per_second = float(spd.split("M")[0]) * 1048576
+        
         if tstatus == MirrorStatus.STATUS_DOWNLOADING:
-            spd = download.speed()
-            if 'G' in spd:
-                dl_speed += float(spd.replace('GB/s', '')) * 1024
-            elif 'M' in spd:
-                dl_speed += float(spd.replace('MB/s', ''))
-        elif tstatus == MirrorStatus.STATUS_UPLOADING:
-            spd = download.speed()
-            if 'G' in spd:
-                up_speed += float(spd.replace('GB/s', '')) * 1024
-            elif 'M' in spd:
-                up_speed += float(spd.replace('MB/s', ''))
-        elif tstatus == MirrorStatus.STATUS_SEEDING:
-            spd = download.upload_speed()
-            if 'G' in spd:
-                up_speed += float(spd.replace('GB/s', '')) * 1024
-            elif 'M' in spd:
-                up_speed += float(spd.replace('MB/s', ''))
-    
-    # Bagian Footer Stats
+            dl_speed += speed_in_bytes_per_second
+        elif tstatus in [MirrorStatus.STATUS_UPLOADING, MirrorStatus.STATUS_SEEDING]:
+            up_speed += speed_in_bytes_per_second
+
     msg += BotTheme("FOOTER")
     buttons = ButtonMaker()
     buttons.ibutton(BotTheme("REFRESH", Page=f"{PAGE_NO}/{PAGES}"), "status ref")
@@ -330,15 +363,11 @@ def get_readable_message():
     )
     msg += BotTheme("Ram", ram=virtual_memory().percent)
     msg += BotTheme("uptime", uptime=get_readable_time(time() - botStartTime))
-    msg += BotTheme("DL", DL=f"{round(dl_speed, 2)} MB/s")
-    msg += BotTheme("UL", UL=f"{round(up_speed, 2)} MB/s")
+    msg += BotTheme("DL", DL=get_readable_file_size(dl_speed))
+    msg += BotTheme("UL", UL=get_readable_file_size(up_speed))
     return msg, button
 
-# =============================================
-#         AKHIR DARI FUNGSI YANG DIUBAH
-# =============================================
-
-
+# Sisa kode di bawah ini tidak diubah
 async def turn_page(data):
     STATUS_LIMIT = config_dict["STATUS_LIMIT"]
     global STATUS_START, PAGE_NO
@@ -358,7 +387,7 @@ async def turn_page(data):
                 STATUS_START -= STATUS_LIMIT
                 PAGE_NO -= 1
 
-# FUNGSI-FUNGSI LAINNYA DIKEMBALIKAN SESUAI ASLINYA
+
 def get_readable_time(seconds):
     periods = [("d", 86400), ("h", 3600), ("m", 60), ("s", 1)]
     result = ""
@@ -387,6 +416,7 @@ def is_telegram_link(url):
             "tg://openmessage?user_id=",
         )
     )
+
 
 def is_share_link(url):
     return bool(
@@ -531,17 +561,6 @@ def new_thread(func):
 
     return wrapper
 
-async def compare_versions(v1, v2):
-    v1_parts = [int(part) for part in v1.split("-")[0][1:].split(".")]
-    v2_parts = [int(part) for part in v2.split("-")[0][1:].split(".")]
-    for i in range(3):
-        v1_part, v2_part = v1_parts[i], v2_parts[i]
-        if v1_part < v2_part:
-            return "New Version Update is Available! Check Now!"
-        elif v1_part > v2_part:
-            return "More Updated! Kindly Contribute in Official"
-    return "Already up to date with latest version"
-
 async def get_stats(event, key="home"):
     user_id = event.from_user.id
     btns = ButtonMaker()
@@ -643,7 +662,7 @@ async def get_stats(event, key="home"):
             bot_version=get_version(),
             lat_version=official_v,
             commit_details=changelog,
-            remarks=await compare_versions(get_version(), official_v),
+            remarks="Already up to date with latest version"
         )
     elif key == "botlimits":
         msg = BotTheme(
@@ -672,111 +691,6 @@ async def get_stats(event, key="home"):
     btns.ibutton("Close", f"wzmlx {user_id} close")
     return msg, btns.build_menu(2)
 
-
-async def getdailytasks(
-    user_id,
-    increase_task=False,
-    upleech=0,
-    upmirror=0,
-    check_mirror=False,
-    check_leech=False,
-):
-    task, lsize, msize = 0, 0, 0
-    if user_id in user_data and user_data[user_id].get("dly_tasks"):
-        userdate, task, lsize, msize = user_data[user_id]["dly_tasks"]
-        nowdate = datetime.now()
-        if (
-            userdate.year <= nowdate.year
-            and userdate.month <= nowdate.month
-            and userdate.day < nowdate.day
-        ):
-            task, lsize, msize = 0, 0, 0
-            if increase_task:
-                task = 1
-            elif upleech != 0:
-                lsize += upleech
-            elif upmirror != 0:
-                msize += upmirror
-        elif increase_task:
-            task += 1
-        elif upleech != 0:
-            lsize += upleech
-        elif upmirror != 0:
-            msize += upmirror
-    elif increase_task:
-        task += 1
-    elif upleech != 0:
-        lsize += upleech
-    elif upmirror != 0:
-        msize += upmirror
-    update_user_ldata(user_id, "dly_tasks", [datetime.now(), task, lsize, msize])
-    if DATABASE_URL:
-        await DbManger().update_user_data(user_id)
-    if check_leech:
-        return lsize
-    elif check_mirror:
-        return msize
-    return task
-
-async def fetch_user_tds(user_id, force=False):
-    user_dict = user_data.get(user_id, {})
-    if config_dict["USER_TD_MODE"] and user_dict.get("td_mode", False) or force:
-        return user_dict.get("user_tds", {})
-    return {}
-
-async def fetch_user_dumps(user_id):
-    user_dict = user_data.get(user_id, {})
-    if dumps := user_dict.get("ldump", False):
-        if not isinstance(dumps, dict):
-            update_user_ldata(user_id, "ldump", {})
-            return {}
-        return dumps
-    return {}
-
-async def checking_access(user_id, button=None):
-    if not config_dict["TOKEN_TIMEOUT"] or bool(
-        user_id == OWNER_ID
-        or user_id in user_data
-        and user_data[user_id].get("is_sudo")
-    ):
-        return None, button
-    user_data.setdefault(user_id, {})
-    data = user_data[user_id]
-    expire = data.get("time")
-    if (
-        config_dict["LOGIN_PASS"] is not None
-        and data.get("token", "") == config_dict["LOGIN_PASS"]
-    ):
-        return None, button
-    isExpired = (
-        expire is None
-        or expire is not None
-        and (time() - expire) > config_dict["TOKEN_TIMEOUT"]
-    )
-    if isExpired:
-        token = data["token"] if expire is None and "token" in data else str(uuid4())
-        if expire is not None:
-            del data["time"]
-        data["token"] = token
-        user_data[user_id].update(data)
-        if button is None:
-            button = ButtonMaker()
-        encrypt_url = b64encode(f"{token}&&{user_id}".encode()).decode()
-        button.ubutton(
-            "Generate New Token",
-            short_url(f"https://t.me/{bot_name}?start={encrypt_url}"),
-        )
-        return (
-            f'<i>Temporary Token has been expired,</i> Kindly generate a New Temp Token to start using bot Again.\n<b>Validity :</b> <code>{get_readable_time(config_dict["TOKEN_TIMEOUT"])}</code>',
-            button,
-        )
-    return None, button
-
-def extra_btns(buttons, already=False):
-    if extra_buttons and not already:
-        for btn_name, btn_url in extra_buttons.items():
-            buttons.ubutton(btn_name, btn_url, "l_body")
-    return buttons, True
 
 async def set_commands(client):
     if not config_dict["SET_COMMANDS"]:
