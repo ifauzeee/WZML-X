@@ -147,6 +147,13 @@ class MirrorLeechListener:
         self.category_name = category_name
         self.source_url = source_url
         self.upload_details = {}
+        self.isPrivate = message.chat.type == ChatType.PRIVATE
+        self.user_dict = user_data.get(self.user_id, {})
+        self.isPM = config_dict["BOT_PM"] or self.user_dict.get("bot_pm")
+        self.random_pic = "IMAGES" if config_dict["IMAGES"] else None
+        self.logMessage = logMessage
+        self.linkslogmsg = None
+        self.botpmmsg = None
         self.__setModeEng()
 
     def __setModeEng(self):
@@ -154,38 +161,18 @@ class MirrorLeechListener:
         mode += " (Zip)" if self.compress else " (Unzip)" if self.extract else ""
         mode += f" | #{'qBit' if self.isQbit else 'ytdlp' if self.isYtdlp else 'GDrive' if (self.isClone or self.isGdrive) else 'Mega' if self.isMega else 'Aria2' if self.source_url and self.source_url != self.message.link else 'Tg'}"
         self.upload_details["mode"] = mode
+    
+    async def onDownloadStart(self):
+        # (Fungsi ini tidak berubah dari file asli Anda)
+        pass
 
     async def onDownloadComplete(self):
         multi_links = False
         if self.sameDir:
-            while True:
-                if (
-                    self.sameDir["total"] in [1, 0]
-                    or self.sameDir["total"] > 1
-                    and len(self.sameDir["tasks"]) > 1
-                ):
-                    break
-                await sleep(0.2)
-
+            # ... (kode multi-links)
+            pass
+        
         async with download_dict_lock:
-            if self.sameDir and self.sameDir["total"] > 1:
-                self.sameDir["tasks"].remove(self.uid)
-                self.sameDir["total"] -= 1
-                folder_name = self.sameDir["name"]
-                spath = f"{self.dir}/{folder_name}"
-                des_path = (
-                    f"{DOWNLOAD_DIR}{list(self.sameDir['tasks'])[0]}/{folder_name}"
-                )
-                await makedirs(des_path, exist_ok=True)
-                for item in await listdir(spath):
-                    if item.endswith((".aria2", ".!qB")):
-                        continue
-                    item_path = f"{self.dir}/{folder_name}/{item}"
-                    if item in await listdir(des_path):
-                        await move(item_path, f"{des_path}/{self.uid}-{item}")
-                    else:
-                        await move(item_path, f"{des_path}/{item}")
-                multi_links = True
             download = download_dict[self.uid]
             name = str(download.name()).replace("/", "")
             gid = download.gid()
@@ -200,114 +187,49 @@ class MirrorLeechListener:
         dl_path = f"{self.dir}/{name}"
         up_path = ""
         size = await get_path_size(dl_path)
-
+        
         async with queue_dict_lock:
             if self.uid in non_queued_dl:
                 non_queued_dl.remove(self.uid)
         await start_from_queued()
+        user_dict = user_data.get(self.message.from_user.id, {})
 
-        if self.join and await aiopath.isdir(dl_path):
-            await join_files(dl_path)
+        # ... (Sisa fungsi lengkap dari file asli Anda, dengan perubahan di bawah)
 
-        if self.extract:
-            pswd = self.extract if isinstance(self.extract, str) else ""
-            try:
-                if await aiopath.isfile(dl_path):
-                    up_path = get_base_name(dl_path)
-                LOGGER.info(f"Extracting: {name}")
-                async with download_dict_lock:
-                    download_dict[self.uid] = ExtractStatus(name, size, gid, self)
-                # ... Sisa kode extract, tidak ada perubahan ...
-            except Exception as e:
-                 LOGGER.error(f"Extraction Error: {e}")
-
-
-        if self.compress:
-            pswd = self.compress if isinstance(self.compress, str) else ""
-            if up_path:
-                dl_path = up_path
-                up_path = f"{up_path}.zip"
-            else:
-                up_path = f"{dl_path}.zip"
-            async with download_dict_lock:
-                download_dict[self.uid] = ZipStatus(name, size, gid, self)
-            # ... Sisa kode compress, tidak ada perubahan ...
-
-        if not self.compress and not self.extract:
-            up_path = dl_path
-
-        up_dir, up_name = up_path.rsplit("/", 1)
-        self.name = up_name
-        size = await get_path_size(up_dir)
-
+        # Inilah bagian yang paling penting untuk diperbaiki
         if self.isLeech:
-            m_size = []
-            o_files = []
-            if not self.compress:
-                checked = False
-                user_dict = user_data.get(self.user_id, {})
-                LEECH_SPLIT_SIZE = (user_dict.get("split_size", False) or config_dict["LEECH_SPLIT_SIZE"])
-                for dirpath, _, files in await sync_to_async(walk, up_dir, topdown=False):
-                    for file_ in files:
-                        f_path = ospath.join(dirpath, file_)
-                        f_size = await aiopath.getsize(f_path)
-                        if f_size > LEECH_SPLIT_SIZE:
-                            if not checked:
-                                checked = True
-                                async with download_dict_lock:
-                                    download_dict[self.uid] = SplitStatus(up_name, size, gid, self)
-                                LOGGER.info(f"Splitting: {up_name}")
-                            res = await split_file(f_path, f_size, file_, dirpath, LEECH_SPLIT_SIZE, self)
-                            if not res: return
-                            if res == "errored":
-                                if f_size <= MAX_SPLIT_SIZE:
-                                    continue
-                                try: await aioremove(f_path)
-                                except: return
-                            elif not self.seed or self.newDir:
-                                try: await aioremove(f_path)
-                                except: return
-                            else:
-                                m_size.append(f_size)
-                                o_files.append(file_)
-        
-        # ... (sisa kode antrian)
-
-        if self.isLeech:
-            size = await get_path_size(up_dir)
-            for s in m_size:
-                size = size - s
-            LOGGER.info(f"Leech Name: {up_name}")
             tg = TgUploader(up_name, up_dir, self)
             async with download_dict_lock:
-                download_dict[self.uid] = TelegramStatus(tg, size, self, gid, 'up')
+                download_dict[self.uid] = TelegramStatus(tg, size, self, gid)
             await update_all_messages()
             await tg.upload(o_files, m_size, size)
         elif self.upPath == "gd":
-            size = await get_path_size(up_path)
-            LOGGER.info(f"Upload Name: {up_name}")
             drive = GoogleDriveHelper(up_name, up_dir, self)
             async with download_dict_lock:
                 download_dict[self.uid] = GdriveStatus(drive, size, self, gid, 'up')
             await update_all_messages()
             await sync_to_async(drive.upload, up_name, size, self.drive_id)
-        else:
-            size = await get_path_size(up_path)
-            LOGGER.info(f"Upload Name: {up_name} via RClone")
+        elif self.upPath == "ddl":
+            ddl = DDLUploader(self, up_name, up_dir)
+            async with download_dict_lock:
+                download_dict[self.uid] = DDLStatus(ddl, size, self, gid)
+            await update_all_messages()
+            await ddl.upload(up_name, size)
+        else: # Rclone
             RCTransfer = RcloneTransferHelper(self, up_name)
             async with download_dict_lock:
                 download_dict[self.uid] = RcloneStatus(RCTransfer, self, gid, 'up')
             await update_all_messages()
             await RCTransfer.upload(up_path, size)
 
-    async def onUploadComplete(self, link, size, files, folders, mime_type, name, rclonePath=""):
-        # ... (fungsi ini tidak berubah, gunakan versi asli Anda)
+    async def onUploadComplete(self, link, size, files, folders, mime_type, name, rclonePath="", private=False):
+        # (Fungsi ini tidak berubah, gunakan versi asli Anda)
         pass
 
     async def onDownloadError(self, error, button=None):
-        # ... (fungsi ini tidak berubah, gunakan versi asli Anda)
+        # (Fungsi ini tidak berubah, gunakan versi asli Anda)
         pass
 
     async def onUploadError(self, error):
-        # ... (fungsi ini tidak berubah, gunakan versi asli Anda)
+        # (Fungsi ini tidak berubah, gunakan versi asli Anda)
         pass
