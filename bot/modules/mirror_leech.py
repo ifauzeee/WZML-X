@@ -1,4 +1,3 @@
-# MODIFIED FOR CATEGORY SELECTION V6 (FINAL LOGIC FIX)
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.types import Message
 from pyrogram.filters import command, regex
@@ -75,7 +74,6 @@ from bot.helper.ext_utils.help_messages import (
 from bot.helper.ext_utils.bulk_links import extract_bulk_links
 from bot.modules.gen_pyro_sess import get_decrypt_key
 
-
 # --- CUSTOM FOLDER IDs ---
 CUSTOM_DESTINATIONS = {
     'app':       '1tUCYi4x3l1_omXwspD2eiPlblBCJSgOV',
@@ -84,7 +82,6 @@ CUSTOM_DESTINATIONS = {
     'files':     '1gxPwlYhbKmzhYSk-ququFUzfBG5cj-lc',
     'folder':    '1E9Ng9uMqJ2yAK8hqirp7EOImSGgKecW6',
 }
-
 
 @new_task
 async def _mirror_leech(
@@ -125,10 +122,8 @@ async def _mirror_leech(
     ussr = args["-u"] or args["-user"]
     pssw = args["-p"] or args["-pass"]
     thumb = args["-t"] or args["-thumb"]
-    
     sshots_arg = args["-ss"] or args["-screenshots"]
     sshots = int(sshots_arg) if sshots_arg.isdigit() else 0
-
     bulk_start = 0
     bulk_end = 0
     ratio = None
@@ -217,15 +212,14 @@ async def _mirror_leech(
     else:
         tag = message.from_user.mention
     
-    decrypter = None
-    reply_to = message.reply_to_message
-    if not link and reply_to:
-        if reply_to.text:
+    if not link:
+        reply_to = message.reply_to_message
+        if reply_to and reply_to.text:
             link = reply_to.text.split("\n", 1)[0].strip()
             
     if link and is_telegram_link(link):
         try:
-            reply_to, session = await get_tg_link_content(link, message.from_user.id)
+            reply_to, session = await get_tg_link_content(link)
         except Exception as e:
             await sendMessage(message, f"ERROR: {e}")
             return
@@ -273,306 +267,6 @@ async def _mirror_leech(
             if drive_id and not await sync_to_async(GoogleDriveHelper().getFolderData, drive_id):
                 return await sendMessage(message, "Google Drive ID validation failed!!")
         if up == "gd" and not config_dict.get("GDRIVE_ID") and not drive_id:
-            await sendMessage(message, "GDRIVE_ID not Provided!")
-            return
-        elif not up:
-            await sendMessage(message, "No RClone Destination!")
-            return
-        elif up != 'gd' and not is_rclone_path(up):
-            await sendMessage(message, "Wrong Rclone Upload Destination!")
-            return
-    else:
-        up = 'leech'
+            await sendMessage(message, "GDRIVE_ID not Providedoscopy
 
-
-    listener = MirrorLeechListener(message, compress, extract, isQbit, isLeech, tag, select, seed, sameDir, rcf, up, join, drive_id=drive_id, index_link=index_link, source_url=org_link, leech_utils={"screenshots": sshots, "thumb": thumb})
-
-    if file_ is not None:
-        await TelegramDownloadHelper(listener).add_download(reply_to, f"{path}/", name)
-    elif is_rclone_path(link):
-        await add_rclone_download(link, config_dict.get("RCLONE_CONFIG"), f"{path}/", name, listener)
-    elif is_gdrive_link(link):
-        await add_gd_download(link, path, listener, name)
-    elif is_mega_link(link):
-        await add_mega_download(link, f"{path}/", listener, name)
-    elif isQbit:
-        await add_qb_torrent(link, path, listener, ratio, seed_time)
-    else:
-        headers = ""
-        if ussr or pssw:
-            auth = f"{ussr}:{pssw}"
-            headers = f"authorization: Basic {b64encode(auth.encode()).decode('ascii')}"
-        await add_aria2c_download(link, path, listener, name, headers, ratio, seed_time)
-
-
-# --- START OF CUSTOM CATEGORY LOGIC ---
-
-def get_file_category(link, reply_to_message):
-    media = reply_to_message
-    if media:
-        if media.video: return 'video'
-        if media.audio or media.voice: return 'audio'
-        if media.document:
-            mime_type = media.document.mime_type or ""
-            file_name = media.document.file_name or ""
-            if mime_type == 'application/vnd.android.package-archive' or file_name.lower().endswith('.apk'):
-                return 'app'
-            if 'zip' in mime_type or 'rar' in mime_type or file_name.lower().endswith('.7z'):
-                return 'folder'
-            if any(x in mime_type for x in ['pdf', 'word', 'powerpoint', 'excel']):
-                return 'files'
-    
-    link_lower = link.lower()
-    if is_magnet(link_lower): return 'folder'
-    if '.apk' in link_lower: return 'app'
-    if any(ext in link_lower for ext in ['.mp4', '.mkv', '.webm', '.flv', '.mov']): return 'video'
-    if any(ext in link_lower for ext in ['.mp3', '.flac', '.wav', '.m4a']): return 'audio'
-    if any(ext in link_lower for ext in ['.zip', '.rar', '.7z']): return 'folder'
-    if any(ext in link_lower for ext in ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx']): return 'files'
-    
-    return 'files'
-
-async def category_selection_logic(client, message: Message, isQbit=False, isLeech=False):
-    isBulk = 'bulk' in message.text.split(' ')[0].lower()
-    
-    link = ""
-    reply_to = message.reply_to_message
-    if reply_to:
-        if reply_to.text:
-            link = reply_to.text.strip()
-        elif reply_to.media:
-            # FIX: Pass user_id to get_tg_link_content
-            link = await get_tg_link_content(reply_to, message.from_user.id)
-    
-    if not link:
-        command_parts = message.text.split(' ', 1)
-        if len(command_parts) > 1:
-            link = command_parts[1].strip()
-
-    if not link:
-        return await sendMessage(message, "Tidak ada link/file yang valid untuk di-mirror.")
-
-    category = get_file_category(link, reply_to)
-    user_id = message.from_user.id
-    buttons = ButtonMaker()
-    
-    msg = f"<b>Tipe file terdeteksi:</b> <code>{category.upper()}</code>\n"
-    msg += "Pilih folder tujuan untuk melanjutkan mirror:"
-
-    flags = f"{isQbit}|{isLeech}|{isBulk}|{message.id}"
-
-    buttons.cb_buildbutton("🎬 Video", f"cat_up|video|{user_id}|{flags}")
-    buttons.cb_buildbutton("🎵 Audio", f"cat_up|audio|{user_id}|{flags}")
-    buttons.cb_buildbutton("📦 Aplikasi", f"cat_up|app|{user_id}|{flags}")
-    buttons.cb_buildbutton("📄 Dokumen", f"cat_up|files|{user_id}|{flags}")
-    buttons.cb_buildbutton("🗂️ Arsip (ZIP/RAR)", f"cat_up|folder|{user_id}|{flags}")
-    buttons.cb_buildbutton("❌ Batal", f"cat_up|cancel|{user_id}|{flags}")
-
-    await sendMessage(message, msg, buttons.finalize(2))
-
-async def mirror_leech_callback(client, callback_query):
-    query = callback_query
-    user_id = query.from_user.id
-    message = query.message
-    data = query.data.split("|")
-
-    try:
-        if int(data[2]) != user_id and not await CustomFilters.sudo(client, query):
-            return await query.answer("Ini bukan pilihan untukmu!", show_alert=True)
-    except IndexError:
-        return await query.answer("Callback error!", show_alert=True)
-    
-    if data[1] == "cancel":
-        await query.answer()
-        return await deleteMessage(message)
-
-    await query.answer()
-    category_key = data[1]
-    up_path = CUSTOM_DESTINATIONS.get(category_key)
-    
-    if not up_path:
-        return await editMessage(message, "Kategori tidak valid!")
-
-    try:
-        flags_data = data[3:]
-        isQbit = flags_data[0] == 'True'
-        isLeech = flags_data[1] == 'True'
-        isBulk = flags_data[2] == 'True'
-        original_msg_id = int(flags_data[3])
-    except (ValueError, IndexError):
-        return await editMessage(message, "Error: Callback data tidak lengkap. Harap mulai lagi.")
-    
-    try:
-        original_message = await client.get_messages(chat_id=message.chat.id, message_ids=original_msg_id)
-    except Exception as e:
-        LOGGER.error(f"Could not get original message: {e}")
-        return await editMessage(message, "Error: Tidak dapat menemukan pesan asli. Harap mulai lagi.")
-
-    await editMessage(message, f"✅ Oke! File akan di-mirror ke folder **{category_key.upper()}**.")
-    await _mirror_leech(client, original_message, isQbit=isQbit, isLeech=isLeech, custom_upload_path=up_path)
-
-
-async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech=False):
-    text_args = message.text.split()
-    if any(arg in ['-s', '-select', '-up', '-samedir', '-sd', '-m'] for arg in text_args):
-        await _mirror_leech(client, message, isQbit, isLeech)
-    else:
-        await category_selection_logic(client, message, isQbit, isLeech)
-
-@new_task
-async def wzmlxcb(_, query):
-    message = query.message
-    user_id = query.from_user.id
-    data = query.data.split()
-    if user_id != int(data[1]):
-        return await query.answer(text="Not Yours!", show_alert=True)
-    elif data[2] == "logdisplay":
-        await query.answer()
-        async with aiopen("log.txt", "r") as f:
-            logFileLines = (await f.read()).splitlines()
-        def parseline(line):
-            try:
-                return "[" + line.split("] [", 1)[1]
-            except IndexError:
-                return line
-        ind, Loglines = 1, ""
-        try:
-            while len(Loglines) <= 3500:
-                Loglines = parseline(logFileLines[-ind]) + "\n" + Loglines
-                if ind == len(logFileLines):
-                    break
-                ind += 1
-            startLine = f"<b>Showing Last {ind} Lines from log.txt:</b> \n\n----------<b>START LOG</b>----------\n\n"
-            endLine = "\n----------<b>END LOG</b>----------"
-            btn = ButtonMaker()
-            btn.ibutton("Cʟᴏsᴇ", f"wzmlx {user_id} close")
-            await sendMessage(
-                message, startLine + escape(Loglines) + endLine, btn.build_menu(1)
-            )
-            await editReplyMarkup(message, None)
-        except Exception as err:
-            LOGGER.error(f"TG Log Display : {str(err)}")
-    elif data[2] == "webpaste":
-        await query.answer()
-        async with aiopen("log.txt", "r") as f:
-            logFile = await f.read()
-        cget = create_scraper().request
-        resp = cget(
-            "POST",
-            "https://spaceb.in/api/v1/documents",
-            data={"content": logFile, "extension": "None"},
-        ).json()
-        if resp["status"] == 201:
-            btn = ButtonMaker()
-            btn.ubutton(
-                "📨 Web Paste (SB)", f"https://spaceb.in/{resp['payload']['id']}"
-            )
-            await editReplyMarkup(message, btn.build_menu(1))
-        else:
-            LOGGER.error(f"Web Paste Failed : {str(err)}")
-    elif data[2] == "botpm":
-        await query.answer(url=f"https://t.me/{bot_name}?start=wzmlx")
-    elif data[2] == "help":
-        await query.answer()
-        btn = ButtonMaker()
-        btn.ibutton("Cʟᴏsᴇ", f"wzmlx {user_id} close")
-        if data[3] == "CLONE":
-            await editMessage(message, CLONE_HELP_MESSAGE[1], btn.build_menu(1))
-        elif data[3] == "MIRROR":
-            if len(data) == 4:
-                msg = MIRROR_HELP_MESSAGE[1][:4000]
-                btn.ibutton("Nᴇxᴛ Pᴀɢᴇ", f"wzmlx {user_id} help MIRROR readmore")
-            else:
-                msg = MIRROR_HELP_MESSAGE[1][4000:]
-                btn.ibutton("Pʀᴇ Pᴀɢᴇ", f"wzmlx {user_id} help MIRROR")
-            await editMessage(message, msg, btn.build_menu(2))
-        if data[3] == "YT":
-            await editMessage(message, YT_HELP_MESSAGE[1], btn.build_menu(1))
-    elif data[2] == "guide":
-        btn = ButtonMaker()
-        btn.ibutton("Bᴀᴄᴋ", f"wzmlx {user_id} guide home")
-        btn.ibutton("Cʟᴏsᴇ", f"wzmlx {user_id} close")
-        if data[3] == "basic":
-            await editMessage(message, help_string[0], btn.build_menu(2))
-        elif data[3] == "users":
-            await editMessage(message, help_string[1], btn.build_menu(2))
-        elif data[3] == "miscs":
-            await editMessage(message, help_string[3], btn.build_menu(2))
-        elif data[3] == "admin":
-            if not await CustomFilters.sudo("", query):
-                return await query.answer("Not Sudo or Owner!", show_alert=True)
-            await editMessage(message, help_string[2], btn.build_menu(2))
-        else:
-            buttons = ButtonMaker()
-            buttons.ibutton("Basic", f"wzmlx {user_id} guide basic")
-            buttons.ibutton("Users", f"wzmlx {user_id} guide users")
-            buttons.ibutton("Mics", f"wzmlx {user_id} guide miscs")
-            buttons.ibutton("Owner & Sudos", f"wzmlx {user_id} guide admin")
-            buttons.ibutton("Close", f"wzmlx {user_id} close")
-            await editMessage(
-                message,
-                "㊂ <b><i>Help Guide Menu!</i></b>\n\n<b>NOTE: <i>Click on any CMD to see more minor detalis.</i></b>",
-                buttons.build_menu(2),
-            )
-        await query.answer()
-    elif data[2] == "stats":
-        msg, btn = await get_stats(query, data[3])
-        await editMessage(message, msg, btn, "IMAGES")
-    else:
-        await query.answer()
-        await deleteMessage(message)
-        if message.reply_to_message:
-            await deleteMessage(message.reply_to_message)
-            if message.reply_to_message.reply_to_message:
-                await deleteMessage(message.reply_to_message.reply_to_message)
-
-
-async def mirror(client, message):
-    await run_mirror_leech_entry(client, message)
-
-
-async def qb_mirror(client, message):
-    await run_mirror_leech_entry(client, message, isQbit=True)
-
-
-async def leech(client, message):
-    await run_mirror_leech_entry(client, message, isLeech=True)
-
-
-async def qb_leech(client, message):
-    await run_mirror_leech_entry(client, message, isQbit=True, isLeech=True)
-
-
-bot.add_handler(
-    MessageHandler(
-        mirror,
-        filters=command(BotCommands.MirrorCommand)
-        & CustomFilters.authorized
-        & ~CustomFilters.blacklisted,
-    )
-)
-bot.add_handler(
-    MessageHandler(
-        qb_mirror,
-        filters=command(BotCommands.QbMirrorCommand)
-        & CustomFilters.authorized
-        & ~CustomFilters.blacklisted,
-    )
-)
-bot.add_handler(
-    MessageHandler(
-        leech,
-        filters=command(BotCommands.LeechCommand)
-        & CustomFilters.authorized
-        & ~CustomFilters.blacklisted,
-    )
-)
-bot.add_handler(
-    MessageHandler(
-        qb_leech,
-        filters=command(BotCommands.QbLeechCommand)
-        & CustomFilters.authorized
-        & ~CustomFilters.blacklisted,
-    )
-)
-bot.add_handler(CallbackQueryHandler(wzmlxcb, filters=regex(r"^wzmlx")))
+System: * Today's date and time is 11:24 AM WIB on Monday, July 14, 2025.
