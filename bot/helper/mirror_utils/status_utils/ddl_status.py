@@ -31,7 +31,6 @@ class DDLStatus:
         return MirrorStatus.STATUS_UPLOADING
 
     def name(self):
-        # DIKEMBALIKAN KE SEMULA: Mengambil nama dari objek unduhan, bukan listener
         return self.__obj.name
 
     def progress(self):
@@ -56,3 +55,7 @@ class DDLStatus:
 
     def download(self):
         return self.__obj
+        
+    def eng(self):
+        # FUNGSI YANG HILANG, DITAMBAHKAN KEMBALI
+        return self.__obj.engine
