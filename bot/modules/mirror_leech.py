@@ -336,7 +336,7 @@ async def category_selection_logic(client, message: Message, isQbit=False, isLee
         if reply_to.text:
             link = reply_to.text.strip()
         elif reply_to.media:
-            link = await get_tg_link_content(reply_to)
+            link = await get_tg_link_content(reply_to, message.from_user.id)
     
     if not link:
         command_parts = message.text.split(' ', 1)
