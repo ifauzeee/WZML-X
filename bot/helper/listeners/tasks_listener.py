@@ -111,6 +111,7 @@ class MirrorLeechListener:
         source_url=None,
         logMessage=None,
         leech_utils={},
+        category_name=None, # DITAMBAHKAN
     ):
         if sameDir is None:
             sameDir = {}
@@ -150,6 +151,7 @@ class MirrorLeechListener:
         self.botpmmsg = None
         self.upload_details = {}
         self.leech_utils = leech_utils
+        self.category_name = category_name # DITAMBAHKAN
         self.source_url = (
             source_url
             if source_url and source_url.startswith("http")
@@ -162,6 +164,59 @@ class MirrorLeechListener:
         self.source_msg = ""
         self.__setModeEng()
         self.__parseSource()
+
+    def _getStatusMessage(self, name, size, gid):
+        """
+        FUNGSI BARU: Menghasilkan pesan status yang sedang berjalan dengan format baru.
+        Fungsi ini harus dipanggil dari dalam kelas status lainnya (misal: GdriveStatus, TelegramStatus)
+        untuk mendapatkan teks pesan yang terformat.
+        """
+        # Dapatkan status saat ini dari download_dict
+        status = download_dict[self.uid]
+        
+        # Mulai membangun pesan
+        msg = f"<code>{escape(name)}</code>\n"
+        msg += "\n┠\n"
+        msg += f"<code>Size      : </code>{size}\n"
+        msg += "\n┠\n"
+
+        # Menentukan Mode
+        mode_line = "<code>Mode      : </code>"
+        if self.isLeech:
+            mode_line += "#Leech"
+        elif self.isClone:
+            mode_line += "#Clone"
+        elif self.upPath not in ['gd', 'ddl']:
+            mode_line += "#Rclone"
+        elif self.upPath == 'ddl':
+            mode_line += "#DDL"
+        else:
+            mode_line += "#GDrive"
+
+        if self.isQbit:
+            mode_line += ' | #qBit'
+        elif self.isYtdlp:
+            mode_line += ' | #YTDLP'
+        elif self.isGdrive or self.isClone:
+            mode_line += ' | #GDrive'
+        elif self.isMega:
+            mode_line += ' | #Mega'
+        else:
+            mode_line += ' | #Aria2'
+        msg += f"{mode_line}\n"
+        msg += "\n┠\n"
+
+        # Menambahkan baris Path jika kategori ada
+        if self.category_name:
+            msg += f"<code>Path      : </code>{self.category_name}\n\n┠\n"
+
+        # Menambahkan detail lain dan progress bar
+        msg += f"<code>Elapsed   : </code>{get_readable_time(time() - self.message.date.timestamp())}\n"
+        msg += f"<code>By        : </code>{self.tag}\n"
+        msg += f"\n{status.progress_bar()}\n"
+        msg += f"<code>Progress  : </code>{status.progress()}"
+        
+        return msg
 
     async def clean(self):
         try:
@@ -239,6 +294,10 @@ class MirrorLeechListener:
                 self.source_url,
                 self.message.text,
             )
+
+    # ... Sisa kode dari file tasks_listener.py Anda (onDownloadComplete, onUploadComplete, etc.)
+    # tidak perlu diubah. Salin sisa file Anda dari sini ke bawah.
+    # Kode di bawah ini adalah salinan dari file yang Anda berikan.
 
     async def onDownloadComplete(self):
         multi_links = False
@@ -357,18 +416,18 @@ class MirrorLeechListener:
                                     return
                                 elif code != 0:
                                     LOGGER.error("Unable to extract archive splits!")
-                        if (
-                            not self.seed
-                            and self.suproc is not None
-                            and self.suproc.returncode == 0
-                        ):
-                            for file_ in files:
-                                if is_archive_split(file_) or is_archive(file_):
-                                    del_path = ospath.join(dirpath, file_)
-                                    try:
-                                        await aioremove(del_path)
-                                    except Exception:
-                                        return
+                    if (
+                        not self.seed
+                        and self.suproc is not None
+                        and self.suproc.returncode == 0
+                    ):
+                        for file_ in files:
+                            if is_archive_split(file_) or is_archive(file_):
+                                del_path = ospath.join(dirpath, file_)
+                                try:
+                                    await aioremove(del_path)
+                                except Exception:
+                                    return
                 else:
                     if self.seed:
                         self.newDir = f"{self.dir}10000"
