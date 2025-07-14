@@ -361,12 +361,12 @@ async def category_selection_logic(client, message: Message, isQbit=False, isLee
 
     flags = f"{isQbit}|{isLeech}|{isBulk}|{message.id}"
 
-    buttons.cb_buildbutton("🎬 Video", f"cat_up|video|{user_id}|{flags}")
-    buttons.cb_buildbutton("🎵 Audio", f"cat_up|audio|{user_id}|{flags}")
-    buttons.cb_buildbutton("📦 Aplikasi", f"cat_up|app|{user_id}|{flags}")
-    buttons.cb_buildbutton("📄 Dokumen", f"cat_up|files|{user_id}|{flags}")
-    buttons.cb_buildbutton("🗂️ Arsip (ZIP/RAR)", f"cat_up|folder|{user_id}|{flags}")
-    buttons.cb_buildbutton("❌ Batal", f"cat_up|cancel|{user_id}|{flags}")
+    buttons.ibutton("🎬 Video", f"cat_up|video|{user_id}|{flags}")
+    buttons.ibutton("🎵 Audio", f"cat_up|audio|{user_id}|{flags}")
+    buttons.ibutton("📦 Aplikasi", f"cat_up|app|{user_id}|{flags}")
+    buttons.ibutton("📄 Dokumen", f"cat_up|files|{user_id}|{flags}")
+    buttons.ibutton("🗂️ Arsip (ZIP/RAR)", f"cat_up|folder|{user_id}|{flags}")
+    buttons.ibutton("❌ Batal", f"cat_up|cancel|{user_id}|{flags}")
 
     await sendMessage(message, msg, buttons.finalize(2))
 
