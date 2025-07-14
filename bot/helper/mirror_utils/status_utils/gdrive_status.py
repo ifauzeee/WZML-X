@@ -2,6 +2,7 @@
 from time import time
 from bot.helper.ext_utils.bot_utils import (
     MirrorStatus,
+    EngineStatus,
     get_readable_file_size,
     get_readable_time,
     get_progress_bar_string,
@@ -37,11 +38,14 @@ class GdriveStatus:
             return MirrorStatus.STATUS_CLONING
 
     def name(self):
-        # DIKEMBALIKAN KE SEMULA: Mengambil nama dari objek unduhan, bukan listener
         return self.__obj.name
 
     def gid(self) -> str:
         return self.__gid
+        
+    def eng(self):
+        # FUNGSI YANG HILANG, DITAMBAHKAN KEMBALI
+        return EngineStatus().STATUS_GD
 
     def progress(self):
         try:
