@@ -1,4 +1,4 @@
-# FINAL AND CORRECTED __main__.py BASED ON YOUR .BAK
+# FINAL AND CORRECTED __main__.py (BASED ON YOUR .BAK)
 from time import time, monotonic
 from datetime import datetime
 from sys import executable
@@ -87,8 +87,8 @@ from .modules import (
     gd_clean,
     broadcast,
 )
-# We import the new callback handlers from our modified module
-from .modules.mirror_leech import mirror_leech_callback, wzmlxcb
+# Import the callback from our modified module
+from .modules.mirror_leech import mirror_leech_callback
 
 
 async def stats(client, message):
@@ -354,19 +354,8 @@ async def main():
     bot.add_handler(MessageHandler(bot_help, filters=command(BotCommands.HelpCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(stats, filters=command(BotCommands.StatsCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     
-    # Custom category button handler
-    bot.add_handler(CallbackQueryHandler(mirror_leech_callback, filters=regex(r"cat_up")))
-    
-    # Other callback from original file
-    bot.add_handler(CallbackQueryHandler(wzmlxcb, filters=regex(r"^wzmlx")))
-    
-    # All command handlers
-    bot.add_handler(MessageHandler(mirror_leech.mirror, filters=command(BotCommands.MirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(mirror_leech.qb_mirror, filters=command(BotCommands.QbMirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(ytdlp.ytdl, filters=command(BotCommands.YtdlCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(mirror_leech.leech, filters=command(BotCommands.LeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(mirror_leech.qb_leech, filters=command(BotCommands.QbLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(ytdlp.ytdlleech, filters=command(BotCommands.YtdlLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted)) # Corrected function name
+    # Custom category button handler (ADDED)
+    bot.add_handler(CallbackQueryHandler(mirror_leech_callback, filters=regex(r"^cat_sel")))
     
     LOGGER.info(f"WZML-X Bot [@{bot_name}] Started!")
     if user:
