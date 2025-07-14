@@ -1,4 +1,4 @@
-# FINAL AUTOMATED YTDL CODE (V13 - Fixed Stuck Button)
+# FINAL YTDLP CODE (V14 - Fixed Stuck Button with @new_task)
 #!/usr/bin/env python3
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.filters import command, regex, user
@@ -94,7 +94,7 @@ class YtSelection:
         self.formats = {}
         self.qual = None
 
-    @new_task # <--- THIS IS THE FIX. Changed from @new_thread
+    @new_task  # <--- INI ADALAH PERBAIKANNYA
     async def __event_handler(self):
         pfunc = partial(select_format, obj=self)
         handler = self.__client.add_handler(
@@ -204,34 +204,11 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
     input_list = text[0].split(" ")
     qual = ""
     arg_base = {
-        "link": "",
-        "-i": 0,
-        "-m": "",
-        "-sd": "",
-        "-samedir": "",
-        "-s": False,
-        "-select": False,
-        "-opt": "",
-        "-options": "",
-        "-b": False,
-        "-bulk": False,
-        "-n": "",
-        "-name": "",
-        "-z": False,
-        "-zip": False,
-        "-up": "",
-        "-upload": False,
-        "-rcf": "",
-        "-id": "",
-        "-index": "",
-        "-c": "",
-        "-category": "",
-        "-ud": "",
-        "-dump": "",
-        "-ss": "0",
-        "-screenshots": "",
-        "-t": "",
-        "-thumb": "",
+        "link": "", "-i": 0, "-m": "", "-sd": "", "-samedir": "", "-s": False, "-select": False,
+        "-opt": "", "-options": "", "-b": False, "-bulk": False, "-n": "", "-name": "",
+        "-z": False, "-zip": False, "-up": "", "-upload": False, "-rcf": "", "-id": "",
+        "-index": "", "-c": "", "-category": "", "-ud": "", "-dump": "", "-ss": "0",
+        "-screenshots": "", "-t": "", "-thumb": "",
     }
 
     args = arg_parser(input_list[1:], arg_base)
@@ -243,7 +220,6 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
         multi = 0
 
     select = args["-s"] or args["-select"]
-    isBulk = args["-b"] or args["-bulk"]
     opt = args["-opt"] or args["-options"]
     folder_name = args["-m"] or args["-sd"] or args["-samedir"]
     name = args["-n"] or args["-name"]
@@ -255,128 +231,21 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
     index_link = args["-index"]
     gd_cat = args["-c"] or args["-category"]
     user_dump = args["-ud"] or args["-dump"]
-    bulk_start = 0
-    bulk_end = 0
     thumb = args["-t"] or args["-thumb"]
     sshots_arg = args["-ss"] or args["-screenshots"]
     sshots = int(sshots_arg) if sshots_arg.isdigit() else 0
-
-    if not isinstance(isBulk, bool):
-        dargs = isBulk.split(":")
-        bulk_start = dargs[0] or None
-        if len(dargs) == 2:
-            bulk_end = dargs[1] or None
-        isBulk = True
-
-    if drive_id and is_gdrive_link(drive_id):
-        drive_id = GoogleDriveHelper.getIdFromUrl(drive_id)
-
-    if folder_name and not isBulk:
-        folder_name = f"/{folder_name}"
-        if sameDir is None:
-            sameDir = {"total": multi, "tasks": set(), "name": folder_name}
-        sameDir["tasks"].add(message.id)
-
-    if isBulk:
-        try:
-            bulk = await extract_bulk_links(message, bulk_start, bulk_end)
-            if len(bulk) == 0:
-                raise ValueError("Bulk Empty!")
-        except Exception:
-            await sendMessage(
-                message,
-                "Reply to text file or tg message that have links seperated by new line!",
-            )
-            return
-        b_msg = input_list[:1]
-        b_msg.append(f"{bulk[0]} -i {len(bulk)}")
-        nextmsg = await sendMessage(message, " ".join(b_msg))
-        nextmsg = await client.get_messages(
-            chat_id=message.chat.id, message_ids=nextmsg.id
-        )
-        nextmsg.from_user = message.from_user
-        _ytdl(client, nextmsg, isLeech, sameDir, bulk)
-        return
-
-    if len(bulk) != 0:
-        del bulk[0]
-
-    @new_task
-    async def __run_multi():
-        if multi <= 1:
-            return
-        await sleep(5)
-        if len(bulk) != 0:
-            msg = input_list[:1]
-            msg.append(f"{bulk[0]} -i {multi - 1}")
-            nextmsg = await sendMessage(message, " ".join(msg))
-        else:
-            msg = [s.strip() for s in input_list]
-            index = msg.index("-i")
-            msg[index + 1] = f"{multi - 1}"
-            nextmsg = await client.get_messages(
-                chat_id=message.chat.id, message_ids=message.reply_to_message_id + 1
-            )
-            nextmsg = await sendMessage(nextmsg, " ".join(msg))
-        nextmsg = await client.get_messages(
-            chat_id=message.chat.id, message_ids=nextmsg.id
-        )
-        if folder_name:
-            sameDir["tasks"].add(nextmsg.id)
-        nextmsg.from_user = message.from_user
-        await sleep(5)
-        _ytdl(client, nextmsg, isLeech, sameDir, bulk)
-
-    path = f"{DOWNLOAD_DIR}{message.id}{folder_name}"
-
-    if len(text) > 1 and text[1].startswith("Tag: "):
-        tag, id_ = text[1].split("Tag: ")[1].split()
-        message.from_user = await client.get_users(id_)
-        try:
-            await message.unpin()
-        except Exception:
-            pass
-    elif (sender_chat := message.sender_chat):
-        tag = sender_chat.title
-
-    user_id = message.from_user.id
-
-    user_dict = user_data.get(user_id, {})
-
-    opt = opt or user_dict.get("yt_opt") or config_dict["YT_DLP_OPTIONS"]
-
-    if (username := message.from_user.username):
-        tag = f"@{username}"
-    else:
-        tag = message.from_user.mention
 
     if not link and (reply_to := message.reply_to_message) and reply_to.text:
         link = reply_to.text.split("\n", 1)[0].strip()
 
     if not is_url(link):
-        btn = ButtonMaker()
-        btn.ibutton(
-            "Cʟɪᴄᴋ Hᴇʀᴇ Tᴏ Rᴇᴀᴅ Mᴏʀᴇ ...", f"wzmlx {message.from_user.id} help YT"
-        )
-        await sendMessage(message, YT_HELP_MESSAGE[0], btn.build_menu(1))
-        await delete_links(message)
+        await sendMessage(message, YT_HELP_MESSAGE[0])
         return
 
-    error_msg = []
-    error_button = None
-    task_utilis_msg, error_button = await task_utils(message)
-    if task_utilis_msg:
-        error_msg.extend(task_utilis_msg)
-
-    if error_msg:
-        final_msg = f"Hey, <b>{tag}</b>,\n"
-        for __i, __msg in enumerate(error_msg, 1):
-            final_msg += f"\n<b>{__i}</b>: {__msg}\n"
-        if error_button is not None:
-            error_button = error_button.build_menu(2)
-        await sendMessage(message, final_msg, error_button)
-        await delete_links(message)
-        return
+    if (sender_chat := message.sender_chat):
+        tag = sender_chat.title
+    else:
+        tag = message.from_user.mention
 
     if not isLeech:
         if config_dict["DEFAULT_UPLOAD"] == "rc" and not up or up == "rc":
@@ -405,85 +274,31 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
             ):
                 drive_id, index_link, is_cancelled = await open_category_btns(message)
                 if is_cancelled:
-                    await delete_links(message)
                     return
             if drive_id and not await sync_to_async(
                 GoogleDriveHelper().getFolderData, drive_id
             ):
                 return await sendMessage(message, "Google Drive ID validation failed!!")
         if up == "gd" and not config_dict["GDRIVE_ID"] and not drive_id:
-            await sendMessage(message, "GDRIVE_ID not Provided!")
-            await delete_links(message)
-            return
+            return await sendMessage(message, "GDRIVE_ID not Provided!")
         elif not up:
-            await sendMessage(message, "No Rclone Destination!")
-            await delete_links(message)
-            return
-        elif up not in ["rcl", "gd", "ddl"]:
-            if up.startswith("mrcc:"):
-                config_path = f"rclone/{message.from_user.id}.conf"
-            else:
-                config_path = "rclone.conf"
-            if not await aiopath.exists(config_path):
-                await sendMessage(message, f"Rclone Config: {config_path} not Exists!")
-                await delete_links(message)
-                return
-        if up != "gd" and up != "ddl" and not is_rclone_path(up):
-            await sendMessage(message, "Wrong Rclone Upload Destination!")
-            await delete_links(message)
-            return
-    else:
-        if user_dump and (user_dump.isdigit() or user_dump.startswith("-")):
-            up = int(user_dump)
-        elif user_dump and user_dump.startswith("@"):
-            up = user_dump
-        elif (ldumps := await fetch_user_dumps(message.from_user.id)):
-            if user_dump and user_dump.casefold() == "all":
-                up = [dump_id for dump_id in ldumps.values()]
-            elif user_dump:
-                up = next(
-                    (
-                        dump_id
-                        for name_, dump_id in ldumps.items()
-                        if user_dump.casefold() == name_.casefold()
-                    ),
-                    "",
-                )
-            if not up and len(ldumps) == 1:
-                up = next(iter(ldumps.values()))
-            elif not up:
-                up, is_cancelled = await open_dump_btns(message)
-                if is_cancelled:
-                    await delete_links(message)
-                    return
-
-    if up == "rcl" and not isLeech:
-        up = await RcloneList(client, message).get_rclone_path("rcu")
-        if not is_rclone_path(up):
-            await sendMessage(message, up)
-            await delete_links(message)
-            return
-
+            return await sendMessage(message, "No Rclone Destination!")
+    
     listener = MirrorLeechListener(
-        message,
-        compress,
-        isLeech=isLeech,
-        tag=tag,
-        sameDir=sameDir,
-        rcFlags=rcf,
-        upPath=up,
-        drive_id=drive_id,
-        index_link=index_link,
-        isYtdlp=True,
-        source_url=link,
+        message, compress, isLeech=isLeech, tag=tag, sameDir=sameDir, rcFlags=rcf,
+        upPath=up, drive_id=drive_id, index_link=index_link, isYtdlp=True, source_url=link,
         leech_utils={"screenshots": sshots, "thumb": thumb},
     )
 
+    user_id = message.from_user.id
+    user_dict = user_data.get(user_id, {})
+    yt_opt = opt or user_dict.get("yt_opt") or config_dict["YT_DLP_OPTIONS"]
+    
     options = {"usenetrc": True, "cookiefile": "cookies.txt"}
-    if opt:
-        yt_opt = opt.split("|")
-        for ytopt in yt_opt:
-            key, value = map(str.strip, ytopt.split(":", 1))
+    if yt_opt:
+        yt_opts = yt_opt.split("|")
+        for opt_item in yt_opts:
+            key, value = map(str.strip, opt_item.split(":", 1))
             if key == "format":
                 if select:
                     qual = ""
@@ -491,15 +306,11 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
                     qual = value
                     continue
             if value.startswith("^"):
-                if "." in value or value == "^inf":
-                    value = float(value.split("^")[1])
-                else:
-                    value = int(value.split("^")[1])
-            elif value.lower() == "true":
-                value = True
-            elif value.lower() == "false":
-                value = False
-            elif value.startswith(("{", "[", "(")) and value.endswith(("}", "]", ")")):
+                if "." in value or value == "^inf": value = float(value.split("^")[1])
+                else: value = int(value.split("^")[1])
+            elif value.lower() == "true": value = True
+            elif value.lower() == "false": value = False
+            elif value.startswith(('{', '[', '(')) and value.endswith(('}', ']', ')')):
                 value = eval(value)
             options[key] = value
 
@@ -509,12 +320,7 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
         result = await sync_to_async(extract_info, link, options)
     except Exception as e:
         msg = str(e).replace("<", " ").replace(">", " ")
-        await sendMessage(message, f"{tag} {msg}")
-        __run_multi()
-        await delete_links(message)
-        return
-    
-    __run_multi()
+        return await sendMessage(message, f"{tag} {msg}")
 
     if not select and (not qual and "format" in options):
         qual = options["format"]
@@ -526,18 +332,16 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
             
     await delete_links(message)
     LOGGER.info(f"Downloading with YT-DLP: {link}")
+    path = f"{DOWNLOAD_DIR}{listener.uid}{folder_name or ''}"
     playlist = "entries" in result
     ydl = YoutubeDLHelper(listener)
-    await ydl.add_download(link, path, name, qual, playlist, opt)
-
+    await ydl.add_download(link, path, name, qual, playlist, yt_opt)
 
 async def ytdl(client, message):
     await _ytdl(client, message)
 
-
 async def ytdlleech(client, message):
     await _ytdl(client, message, isLeech=True)
-
 
 bot.add_handler(
     MessageHandler(
