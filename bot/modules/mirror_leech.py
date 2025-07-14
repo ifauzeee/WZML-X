@@ -139,7 +139,11 @@ async def _mirror_leech(
 
     if custom_upload_path:
         up = custom_upload_path
-        
+    
+    if custom_upload_path and is_gdrive_link(f'https://drive.google.com/drive/folders/{custom_upload_path}'):
+    drive_id = custom_upload_path
+    up = 'gd'
+    
     if not isinstance(seed, bool):
         dargs = seed.split(":")
         ratio = dargs[0] or None
