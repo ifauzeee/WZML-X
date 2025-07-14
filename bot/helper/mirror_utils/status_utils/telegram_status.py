@@ -1,4 +1,3 @@
-# Ganti seluruh isi file dengan ini
 #!/usr/bin/env python3
 from time import time
 from bot.helper.ext_utils.bot_utils import (
