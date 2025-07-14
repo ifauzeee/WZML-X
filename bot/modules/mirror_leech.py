@@ -1,4 +1,3 @@
-# FINAL MERGED AND CORRECTED CODE (V10)
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.types import Message
 from pyrogram.filters import command, regex
@@ -72,9 +71,7 @@ from bot.helper.ext_utils.help_messages import (
     YT_HELP_MESSAGE,
     help_string,
 )
-from bot.helper.ext_utils.bulk_links import extract_bulk_links
 from bot.modules.gen_pyro_sess import get_decrypt_key
-
 
 # --- CUSTOM FOLDER IDs ---
 CUSTOM_DESTINATIONS = {
@@ -133,6 +130,7 @@ async def _mirror_leech(
     reply_to = None
     file_ = None
     session = ""
+    decrypter = None
         
     if not isinstance(seed, bool):
         dargs = seed.split(":")
@@ -211,7 +209,6 @@ async def _mirror_leech(
     else:
         tag = message.from_user.mention
     
-    decrypter = None
     reply_to = message.reply_to_message
     if not link and reply_to:
         if reply_to.text:
@@ -220,6 +217,7 @@ async def _mirror_leech(
     if link and is_telegram_link(link):
         try:
             reply_to, session = await get_tg_link_content(link, message.from_user.id)
+            decrypter = get_decrypt_key() if session else None
         except Exception as e:
             await sendMessage(message, f"ERROR: {e}")
             return
@@ -241,7 +239,7 @@ async def _mirror_leech(
     error_msg = []
     error_button = None
     task_utilis_msg, error_button = await task_utils(message)
-    if task_utilis_msg:
+    if error_msg:
         error_msg.extend(task_utilis_msg)
 
     if error_msg:
@@ -280,11 +278,15 @@ async def _mirror_leech(
     else:
         up = 'leech'
 
-
     listener = MirrorLeechListener(message, compress, extract, isQbit, isLeech, tag, select, seed, sameDir, rcf, up, join, drive_id=drive_id, index_link=index_link, source_url=org_link, leech_utils={"screenshots": sshots, "thumb": thumb})
 
     if file_ is not None:
-        await TelegramDownloadHelper(listener).add_download(reply_to, f"{path}/", name)
+        try:
+            await TelegramDownloadHelper(listener).add_download(reply_to, f"{path}/", name, session, decrypter)
+        except Exception as e:
+            LOGGER.error(f"Failed to start Telegram download: {e}")
+            await sendMessage(message, "Gagal memulai unduhan file Telegram. Silakan periksa log untuk detail.")
+            return
     elif is_rclone_path(link):
         await add_rclone_download(link, config_dict.get("RCLONE_CONFIG"), f"{path}/", name, listener)
     elif is_gdrive_link(link):
@@ -336,9 +338,8 @@ async def category_selection_logic(client, message: Message, isQbit=False, isLee
         if reply_to.text:
             link = reply_to.text.strip()
         elif reply_to.media:
-            # For media, the 'link' is just the message object itself, to be handled by the downloader
-            link = reply_to.text or reply_to.caption or "" # Get text from caption if exists
-    
+            link = reply_to.text or reply_to.caption or ""
+
     if not link and not (reply_to and reply_to.media):
         command_parts = message.text.split(' ', 1)
         if len(command_parts) > 1:
@@ -403,9 +404,8 @@ async def mirror_leech_callback(client, callback_query):
         LOGGER.error(f"Could not get original message: {e}")
         return await editMessage(message, "Error: Tidak dapat menemukan pesan asli. Harap mulai lagi.")
 
-    await editMessage(message, f"✅ Oke! File akan di-mirror ke folder **{category_key.upper()}**.")
+    await editMessage(message, f"✅ Oke! File akan di-mirror ke folder {category_key.upper()}.")
     await _mirror_leech(client, original_message, isQbit=isQbit, isLeech=isLeech, custom_upload_path=up_path)
-
 
 async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech=False):
     text_args = message.text.split()
@@ -521,22 +521,17 @@ async def wzmlxcb(_, query):
             if message.reply_to_message.reply_to_message:
                 await deleteMessage(message.reply_to_message.reply_to_message)
 
-
 async def mirror(client, message):
     await run_mirror_leech_entry(client, message)
-
 
 async def qb_mirror(client, message):
     await run_mirror_leech_entry(client, message, isQbit=True)
 
-
 async def leech(client, message):
     await run_mirror_leech_entry(client, message, isLeech=True)
 
-
 async def qb_leech(client, message):
     await run_mirror_leech_entry(client, message, isQbit=True, isLeech=True)
-
 
 bot.add_handler(
     MessageHandler(
