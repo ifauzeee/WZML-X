@@ -368,7 +368,7 @@ async def category_selection_logic(client, message: Message, isQbit=False, isLee
     buttons.ibutton("🗂️ Arsip (ZIP/RAR)", f"cat_up|folder|{user_id}|{flags}")
     buttons.ibutton("❌ Batal", f"cat_up|cancel|{user_id}|{flags}")
 
-    await sendMessage(message, msg, buttons.finalize(2))
+    await sendMessage(message, msg, buttons.build_menu(2))
 
 async def mirror_leech_callback(client, callback_query):
     query = callback_query
