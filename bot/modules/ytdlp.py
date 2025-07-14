@@ -1,4 +1,4 @@
-# FINAL AUTOMATED YTDL CODE (V11 - BASED ON ORIGINAL FILE)
+# FINAL AUTOMATED YTDL CODE (V12 - Corrected Arguments)
 #!/usr/bin/env python3
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.filters import command, regex, user
@@ -197,63 +197,6 @@ class YtSelection:
             await deleteMessage(self.__reply_to)
         return self.qual
 
-    async def back_to_main(self):
-        if self.__is_playlist:
-            msg = f"Choose Playlist Videos Quality:\nTimeout: {get_readable_time(self.__timeout-(time()-self.__time))}"
-        else:
-            msg = f"Choose Video Quality:\nTimeout: {get_readable_time(self.__timeout-(time()-self.__time))}"
-        await editMessage(self.__reply_to, msg, self.__main_buttons)
-
-    async def qual_subbuttons(self, b_name):
-        buttons = ButtonMaker()
-        tbr_dict = self.formats[b_name]
-        for tbr, d_data in tbr_dict.items():
-            button_name = f"{tbr}K ({get_readable_file_size(d_data[0])})"
-            buttons.ibutton(button_name, f"ytq sub {b_name} {tbr}")
-        buttons.ibutton("Back", "ytq back", "footer")
-        buttons.ibutton("Cancel", "ytq cancel", "footer")
-        subbuttons = buttons.build_menu(2)
-        msg = f"Choose Bit rate for <b>{b_name}</b>:\nTimeout: {get_readable_time(self.__timeout-(time()-self.__time))}"
-        await editMessage(self.__reply_to, msg, subbuttons)
-
-    async def mp3_subbuttons(self):
-        i = "s" if self.__is_playlist else ""
-        buttons = ButtonMaker()
-        audio_qualities = [64, 128, 320]
-        for q in audio_qualities:
-            audio_format = f"ba/b-mp3-{q}"
-            buttons.ibutton(f"{q}K-mp3", f"ytq {audio_format}")
-        buttons.ibutton("Back", "ytq back")
-        buttons.ibutton("Cancel", "ytq cancel")
-        subbuttons = buttons.build_menu(3)
-        msg = f"Choose mp3 Audio{i} Bitrate:\nTimeout: {get_readable_time(self.__timeout-(time()-self.__time))}"
-        await editMessage(self.__reply_to, msg, subbuttons)
-
-    async def audio_format(self):
-        i = "s" if self.__is_playlist else ""
-        buttons = ButtonMaker()
-        for frmt in ["aac", "alac", "flac", "m4a", "opus", "vorbis", "wav"]:
-            audio_format = f"ba/b-{frmt}-"
-            buttons.ibutton(frmt, f"ytq aq {audio_format}")
-        buttons.ibutton("Back", "ytq back", "footer")
-        buttons.ibutton("Cancel", "ytq cancel", "footer")
-        subbuttons = buttons.build_menu(3)
-        msg = f"Choose Audio{i} Format:\nTimeout: {get_readable_time(self.__timeout-(time()-self.__time))}"
-        await editMessage(self.__reply_to, msg, subbuttons)
-
-    async def audio_quality(self, format):
-        i = "s" if self.__is_playlist else ""
-        buttons = ButtonMaker()
-        for qual in range(11):
-            audio_format = f"{format}{qual}"
-            buttons.ibutton(qual, f"ytq {audio_format}")
-        buttons.ibutton("Back", "ytq aq back")
-        buttons.ibutton("Cancel", "ytq aq cancel")
-        subbuttons = buttons.build_menu(5)
-        msg = f"Choose Audio{i} Quality:\n0 is best and 10 is worst\nTimeout: {get_readable_time(self.__timeout-(time()-self.__time))}"
-        await editMessage(self.__reply_to, msg, subbuttons)
-
-
 def extract_info(link, options):
     with YoutubeDL(options) as ydl:
         result = ydl.extract_info(link, download=False)
@@ -294,106 +237,25 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
     index_link = args["-index"]
     gd_cat = args["-c"] or args["-category"]
     user_dump = args["-ud"] or args["-dump"]
-    bulk_start = 0
-    bulk_end = 0
     thumb = args["-t"] or args["-thumb"]
     sshots_arg = args["-ss"] or args["-screenshots"]
     sshots = int(sshots_arg) if sshots_arg.isdigit() else 0
-
-    if not isinstance(isBulk, bool):
-        dargs = isBulk.split(":")
-        bulk_start = dargs[0] or None
-        if len(dargs) == 2:
-            bulk_end = dargs[1] or None
-        isBulk = True
-
-    if drive_id and is_gdrive_link(drive_id):
-        drive_id = GoogleDriveHelper.getIdFromUrl(drive_id)
-
-    if folder_name and not isBulk:
-        folder_name = f"/{folder_name}"
-        if sameDir is None:
-            sameDir = {"total": multi, "tasks": set(), "name": folder_name}
-        sameDir["tasks"].add(message.id)
-
-    if isBulk:
-        try:
-            bulk = await extract_bulk_links(message, bulk_start, bulk_end)
-            if not bulk:
-                raise ValueError("Bulk Empty!")
-        except:
-            await sendMessage(message, "Reply to a text file or a tg message that has links separated by a new line!")
-            return
-        b_msg = input_list[:1]
-        b_msg.append(f"{bulk[0]} -i {len(bulk)}")
-        nextmsg = await sendMessage(message, " ".join(b_msg))
-        nextmsg = await client.get_messages(chat_id=message.chat.id, message_ids=nextmsg.id)
-        nextmsg.from_user = message.from_user
-        _ytdl(client, nextmsg, isLeech, sameDir, bulk)
-        return
-
-    if len(bulk) != 0:
-        del bulk[0]
-
-    @new_task
-    async def __run_multi():
-        if multi <= 1: return
-        await sleep(5)
-        if len(bulk) > 0:
-            msg = input_list[:1]
-            msg.append(f"{bulk[0]} -i {multi - 1}")
-            nextmsg = await sendMessage(message, " ".join(msg))
-        else:
-            msg = [s.strip() for s in input_list]
-            index = msg.index("-i")
-            msg[index + 1] = f"{multi - 1}"
-            nextmsg = await client.get_messages(chat_id=message.chat.id, message_ids=message.reply_to_message_id + 1)
-            nextmsg = await sendMessage(nextmsg, " ".join(msg))
-        nextmsg = await client.get_messages(chat_id=message.chat.id, message_ids=nextmsg.id)
-        if folder_name:
-            sameDir["tasks"].add(nextmsg.id)
-        nextmsg.from_user = message.from_user
-        await sleep(5)
-        _ytdl(client, nextmsg, isLeech, sameDir, bulk)
-
-    path = f"{DOWNLOAD_DIR}{message.id}{folder_name}"
-    
-    sender_chat = message.sender_chat
-    if sender_chat:
-        tag = sender_chat.title
-    else:
-        tag = message.from_user.mention
-    
-    user_id = message.from_user.id
-    user_dict = user_data.get(user_id, {})
-    opt = opt or user_dict.get("yt_opt") or config_dict["YT_DLP_OPTIONS"]
 
     if not link and (reply_to := message.reply_to_message) and reply_to.text:
         link = reply_to.text.split("\n", 1)[0].strip()
 
     if not is_url(link):
         await sendMessage(message, YT_HELP_MESSAGE[0])
-        await delete_links(message)
         return
 
-    error_msg = []
-    error_button = None
-    task_utilis_msg, error_button = await task_utils(message)
-    if task_utilis_msg:
-        error_msg.extend(task_utilis_msg)
+    sender_chat = message.sender_chat
+    if sender_chat:
+        tag = sender_chat.title
+    else:
+        tag = message.from_user.mention
 
-    if error_msg:
-        final_msg = f"Hey, <b>{tag}</b>,\n"
-        for __i, __msg in enumerate(error_msg, 1):
-            final_msg += f"\n<b>{__i}</b>: {__msg}\n"
-        if error_button is not None:
-            error_button = error_button.build_menu(2)
-        await sendMessage(message, final_msg, error_button)
-        await delete_links(message)
-        return
-        
     if not isLeech:
-        # AUTOMATION LOGIC FOR MIRROR
+        # AUTOMATION LOGIC FOR MIRROR (/ytdl)
         qual = 'bestvideo+bestaudio/best'
         up = 'gd'
         drive_id = CUSTOM_DESTINATIONS.get('video')
@@ -401,7 +263,7 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
             return await sendMessage(message, "Video folder ID not found!")
         LOGGER.info(f"YTDL-Mirror: Auto-selecting best quality for {link}")
     else:
-        # ORIGINAL LOGIC FOR LEECH
+        # ORIGINAL LOGIC FOR LEECH (/ytdlleech)
         up = 'leech'
         drive_id = ''
         index_link = ''
@@ -412,12 +274,16 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
         leech_utils={"screenshots": sshots, "thumb": thumb},
     )
 
+    user_id = message.from_user.id
+    user_dict = user_data.get(user_id, {})
+    yt_opt = opt or user_dict.get("yt_opt") or config_dict["YT_DLP_OPTIONS"]
+    
     options = {'usenetrc': True, 'cookiefile': 'cookies.txt'}
-    if opt:
-        yt_opt = opt.split("|")
-        for ytopt in yt_opt:
-            key, value = map(str.strip, ytopt.split(":", 1))
-            if key == 'format' and not isLeech: continue # Ignore format if mirroring
+    if yt_opt:
+        yt_opts = yt_opt.split("|")
+        for opt_item in yt_opts:
+            key, value = map(str.strip, opt_item.split(":", 1))
+            if key == 'format' and not isLeech: continue
             if value.startswith("^"):
                 if "." in value or value == "^inf": value = float(value.split("^")[1])
                 else: value = int(value.split("^")[1])
@@ -433,16 +299,11 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
         result = await sync_to_async(extract_info, link, options)
     except Exception as e:
         msg = str(e).replace('<', ' ').replace('>', ' ')
-        await sendMessage(message, f"{tag} {msg}")
-        __run_multi()
-        await delete_links(message)
-        return
-    
-    __run_multi()
+        return await sendMessage(message, f"{tag} {msg}")
 
     if not isLeech: # Skip quality selection for mirror
         pass
-    else:
+    else: # Show quality selection for leech
         if not select and (not qual and "format" in options):
             qual = options["format"]
         if not qual:
@@ -452,9 +313,10 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
                 
     await delete_links(message)
     LOGGER.info(f"Downloading with YT-DLP: {link}")
+    path = f"{DOWNLOAD_DIR}{listener.uid}{folder_name or ''}"
     playlist = "entries" in result
     ydl = YoutubeDLHelper(listener)
-    await ydl.add_download(link, path, name, qual, playlist)
+    await ydl.add_download(link, path, name, qual, playlist, yt_opt)
 
 async def ytdl(client, message):
     await _ytdl(client, message)
