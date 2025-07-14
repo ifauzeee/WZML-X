@@ -70,7 +70,7 @@ async def category_selection_logic(client, message: Message, isQbit=False, isLee
 
     cmd_prefix = "qbmirror" if isQbit else "mirror"
     if isLeech: cmd_prefix = "qbleech" if isQbit else "leech"
-    if isZip: cmd_prefix += "zip"
+    # if isZip: cmd_prefix += "zip"
 
     # Auto-suggested category button
     buttons.ibutton(f"📂 {category.capitalize()} (Auto)", f"cat_sel|{cmd_prefix}|{user_id}|{message.id}|{CUSTOM_CATEGORIES.get(category)}")
@@ -138,7 +138,7 @@ async def _mirror_leech(client, message, isQbit=False, isLeech=False, isZip=Fals
     if isLeech:
         up = "leech"
 
-    listener = MirrorLeechListener(message, isZip=isZip, isLeech=isLeech, tag=tag, upPath=up)
+    listener = MirrorLeechListener(message, isLeech=isLeech, tag=tag, upPath=up)
 
     if reply_to and reply_to.media:
         await TelegramDownloadHelper(listener).add_download(reply_to, f"{DOWNLOAD_DIR}{listener.uid}/", name)
