@@ -1,4 +1,4 @@
-# FINAL CORRECTED CODE FOR __main__.py zee
+# FINAL CORRECTED CODE FOR __main__.py
 from time import time, monotonic
 from datetime import datetime
 from sys import executable
@@ -343,7 +343,7 @@ async def main():
     )
     await sync_to_async(start_aria2_listener, wait=False)
 
-    # Add all original handlers
+    # Standard handlers
     bot.add_handler(MessageHandler(start, filters=command(BotCommands.StartCommand)))
     bot.add_handler(CallbackQueryHandler(token_callback, filters=regex(r"^pass")))
     bot.add_handler(MessageHandler(login, filters=command(BotCommands.LoginCommand) & private))
@@ -353,21 +353,19 @@ async def main():
     bot.add_handler(MessageHandler(bot_help, filters=command(BotCommands.HelpCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(stats, filters=command(BotCommands.StatsCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     
-    # Add our new category button handler
+    # Custom category button handler
     bot.add_handler(CallbackQueryHandler(mirror_leech_callback, filters=regex(r"cat_up")))
     
-    # Add other original callbacks
+    # Other callback from original file
     bot.add_handler(CallbackQueryHandler(wzmlxcb, filters=regex(r"^wzmlx")))
-    
-    # Add all original command handlers
+
+    # All command handlers
     bot.add_handler(MessageHandler(mirror_leech.mirror, filters=command(BotCommands.MirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(mirror_leech.qb_mirror, filters=command(BotCommands.QbMirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(ytdlp.ytdl, filters=command(BotCommands.YtdlCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(mirror_leech.leech, filters=command(BotCommands.LeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(mirror_leech.qb_leech, filters=command(BotCommands.QbLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(ytdlp.ytdlleech, filters=command(BotCommands.YtdlLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    
-    # Add remaining handlers from the .BAK file
+    bot.add_handler(MessageHandler(ytdlp.ytdl_leech, filters=command(BotCommands.YtdlLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(clone.clone, filters=command(BotCommands.CloneCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(gd_list.list_search, filters=command(BotCommands.ListCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(cancel_mirror.cancel_mirror, filters=command(BotCommands.CancelMirrorCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
@@ -386,7 +384,7 @@ async def main():
     bot.add_handler(MessageHandler(gen_pyro_sess.get_session, filters=command(BotCommands.GetSession) & CustomFilters.sudo))
     bot.add_handler(MessageHandler(gd_clean.gdclean, filters=command(BotCommands.GdClean) & CustomFilters.sudo))
     bot.add_handler(MessageHandler(broadcast.broadcast_message, filters=command(BotCommands.BroadcastCommand) & CustomFilters.sudo))
-
+    
     LOGGER.info(f"WZML-X Bot [@{bot_name}] Started!")
     if user:
         LOGGER.info(f"WZ's User [@{user.me.username}] Ready!")
