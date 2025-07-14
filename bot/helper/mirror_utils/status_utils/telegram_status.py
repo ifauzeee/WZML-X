@@ -18,7 +18,6 @@ class TelegramStatus:
         self.message = listener.message
 
     def progress_bar(self):
-        # PERBAIKAN: Mengirim self.progress() bukan self
         return get_progress_bar_string(self.progress())
 
     def processed_bytes(self):
