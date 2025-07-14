@@ -146,47 +146,45 @@ def get_readable_message():
         globals()["PAGE_NO"] = PAGES
 
     for download in list(download_dict.values())[STATUS_START : STATUS_LIMIT + STATUS_START]:
+        # ===========================================================
+        # ISI DARI LOOP INI YANG DIUBAH TOTAL
+        # ===========================================================
         if not hasattr(download, 'listener'):
             continue
-            
+
         listener = download.listener
         msg_link = listener.message.link if listener.message.chat.type != ChatType.PRIVATE else ""
         elapsed = time() - download.message.date.timestamp()
 
-        # Format Name
-        msg += f"<code>{escape(download.name())}</code>\n"
+        # Format Nama
+        msg += BotTheme("STATUS_NAME", Name=escape(f"{download.name()}"))
 
         if download.status() not in [MirrorStatus.STATUS_SPLITTING, MirrorStatus.STATUS_SEEDING, MirrorStatus.STATUS_METADATA]:
-            msg += "\n┠\n"
-            msg += f"<code>Size      : </code>{download.size()}\n"
-            msg += "\n┠\n"
+            # Format baru yang Anda inginkan
+            msg += f"\n<code>Size      : </code>{download.size()}"
             
-            mode_line = "<code>Mode      : </code>"
-            if listener.isLeech: mode_line += "#Leech"
-            elif listener.isClone: mode_line += "#Clone"
-            elif listener.upPath and listener.upPath not in ['gd', 'ddl']: mode_line += "#Rclone"
-            elif listener.upPath == 'ddl': mode_line += "#DDL"
-            else: mode_line += "#GDrive"
+            mode_line = ""
+            if listener.isLeech: mode_line += " | #Leech"
+            elif listener.isClone: mode_line += " | #Clone"
+            else: mode_line += " | #GDrive"
 
-            if listener.isQbit: mode_line += ' | #qBit'
-            elif listener.isYtdlp: mode_line += ' | #YTDLP'
-            elif listener.isGdrive or listener.isClone: mode_line += ' | #GDrive'
-            elif listener.isMega: mode_line += ' | #Mega'
-            else: mode_line += ' | #Aria2'
-            
-            msg += f"{mode_line}\n"
-            msg += "\n┠\n"
+            if listener.isQbit: mode_line += " | #qBit"
+            elif listener.isYtdlp: mode_line += " | #YTDLP"
+            else: mode_line += f" | #{download.eng()}"
+
+            msg += f"\n<code>Mode      : </code>{mode_line}"
 
             if listener.category_name:
-                msg += f"<code>Path      : </code>{listener.category_name}\n\n┠\n"
+                msg += f"\n<code>Path      : </code>{listener.category_name}"
             
-            msg += f"<code>Elapsed   : </code>{get_readable_time(elapsed)}\n"
-            msg += f"┖<code>By        : </code>{listener.tag}"
+            msg += f"\n<code>Elapsed   : </code>{get_readable_time(elapsed)}"
+            msg += f"\n┖<code>By        : </code>{listener.tag}"
             
             msg += f"\n\n{download.progress_bar()}\n"
-            msg += f"<code>Progress  : </code>{download.progress()}"
+            msg += f"<code>Progress  : </code>{download.progress()} ({download.speed()})"
 
         elif download.status() == MirrorStatus.STATUS_SEEDING:
+            # Menggunakan BotTheme untuk Seeding agar tidak merusak format
             msg += BotTheme("STATUS", Status=download.status(), Url=msg_link)
             msg += BotTheme("SEED_SIZE", Size=download.size())
             msg += BotTheme("SEED_SPEED", Speed=download.upload_speed())
@@ -196,13 +194,17 @@ def get_readable_message():
             msg += BotTheme("SEED_ENGINE", Engine=download.eng())
             msg += BotTheme("USER", User=listener.tag, Id=listener.user_id)
         else:
+            # Fallback untuk status lain (split, metadata, dll)
             msg += BotTheme("STATUS", Status=download.status(), Url=msg_link)
             msg += BotTheme("STATUS_SIZE", Size=download.size())
             msg += BotTheme("NON_ENGINE", Engine=download.eng())
             msg += BotTheme("USER", User=listener.tag, Id=listener.user_id)
-            
-        msg += f"\n\n/cancel_{download.gid()}"
+
+        msg += f"\n/cancel_{download.gid()}"
         msg += "\n\n"
+        # ===========================================================
+        # AKHIR DARI BLOK YANG DIUBAH
+        # ===========================================================
 
     if len(msg) == 0:
         return None, None
@@ -216,8 +218,7 @@ def get_readable_message():
                 spd = download.upload_speed()
             elif hasattr(download, 'speed'):
                 spd = download.speed()
-        except:
-            pass
+        except: pass
         
         speed_in_bytes = 0
         if 'K' in spd:
@@ -251,17 +252,6 @@ def get_readable_message():
     return msg, button
 
 
-# Sisa file ini dikembalikan seperti aslinya
-async def turn_page(data):
-    # ... (kode asli)
-    pass
-
-def get_readable_time(seconds):
-    # ... (kode asli)
-    pass
-
-# ... dan semua fungsi lainnya sampai akhir file
-# (Saya salin lengkap untuk memastikan tidak ada yang terlewat)
 async def turn_page(data):
     STATUS_LIMIT = config_dict["STATUS_LIMIT"]
     global STATUS_START, PAGE_NO
@@ -354,6 +344,7 @@ def arg_parser(items, arg_base):
     t = len(items)
     i = 0
     arg_start = -1
+
     while i + 1 <= t:
         part = items[i].strip()
         if part in arg_base:
@@ -374,6 +365,7 @@ def arg_parser(items, arg_base):
                 if sub_list:
                     arg_base[part] = " ".join(sub_list)
         i += 1
+
     link = []
     if items[0].strip() not in arg_base:
         if arg_start == -1:
@@ -465,18 +457,6 @@ def new_thread(func):
         future = run_coroutine_threadsafe(func(*args, **kwargs), bot_loop)
         return future.result() if wait else future
     return wrapper
-
-
-async def compare_versions(v1, v2):
-    v1_parts = [int(part) for part in v1.split("-")[0][1:].split(".")]
-    v2_parts = [int(part) for part in v2.split("-")[0][1:].split(".")]
-    for i in range(3):
-        v1_part, v2_part = v1_parts[i], v2_parts[i]
-        if v1_part < v2_part:
-            return "New Version Update is Available! Check Now!"
-        elif v1_part > v2_part:
-            return "More Updated! Kindly Contribute in Official"
-    return "Already up to date with latest version"
 
 
 async def get_stats(event, key="home"):
