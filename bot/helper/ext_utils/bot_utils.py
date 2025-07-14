@@ -735,7 +735,8 @@ async def get_stats(event, key="home"):
             LL=("∞" if (val := config_dict["LEECH_LIMIT"]) == "" else val),
             TV=(
                 "Disabled"
-                if (val := config_dict["TOKEN_TIMEOUT"]) == "" else get_readable_time(val)
+                if (val := config_dict["TOKEN_TIMEOUT"]) == ""
+                else get_readable_time(val)
             ),
             UTI=(
                 "Disabled"
@@ -1034,11 +1035,3 @@ async def set_commands(client):
         LOGGER.info("Bot Commands have been Set & Updated")
     except Exception as err:
         LOGGER.error(err)
-
-def get_mime_type(file_path):
-    """Get MIME type of a file based on its extension or content."""
-    import mimetypes
-    mime_type, _ = mimetypes.guess_type(file_path)
-    if mime_type:
-        return mime_type
-    return 'application/octet-stream'
