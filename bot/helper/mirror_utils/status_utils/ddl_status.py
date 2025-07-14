@@ -29,7 +29,7 @@ class DDLStatus:
         return MirrorStatus.STATUS_DOWNLOADING
 
     def name(self):
-        return self.__obj.name
+        return self.listener.name
         
     def eng(self):
         return EngineStatus().STATUS_ARIA
