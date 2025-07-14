@@ -1,4 +1,4 @@
-# FINAL AND FULLY CORRECTED CODE (V7)
+# FINAL MERGED AND CORRECTED CODE (V7) zee
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.types import Message
 from pyrogram.filters import command, regex
@@ -85,7 +85,6 @@ CUSTOM_DESTINATIONS = {
     'folder':    '1E9Ng9uMqJ2yAK8hqirp7EOImSGgKecW6',
 }
 
-
 @new_task
 async def _mirror_leech(
     client, message, isQbit=False, isLeech=False, sameDir=None, bulk=[], custom_upload_path=None
@@ -135,9 +134,6 @@ async def _mirror_leech(
     file_ = None
     session = ""
 
-    if custom_upload_path:
-        up = custom_upload_path
-        
     if not isinstance(seed, bool):
         dargs = seed.split(":")
         ratio = dargs[0] or None
@@ -262,21 +258,25 @@ async def _mirror_leech(
         LOGGER.info(link)
 
     if not isLeech:
-        if custom_upload_path and is_gdrive_link(f'https://drive.google.com/drive/folders/{custom_upload_path}'):
-             drive_id = custom_upload_path
-             up = 'gd'
+        if custom_upload_path:
+            drive_id = custom_upload_path
+            up = 'gd'
         if not up:
             if config_dict["DEFAULT_UPLOAD"] == "rc":
                 up = config_dict.get("RCLONE_PATH", "")
             else:
                 up = "gd"
-
-        if up == 'gd' and not drive_id and not config_dict.get('GDRIVE_ID'):
-            return await sendMessage(message, "GDRIVE_ID not Provided!")
+        if up == "gd" and not drive_id and not config_dict.get("GDRIVE_ID"):
+             await sendMessage(message, "GDRIVE_ID not Provided!")
+             return
+        if up == "gd" and drive_id and not await sync_to_async(GoogleDriveHelper().getFolderData, drive_id):
+            return await sendMessage(message, "Google Drive ID validation failed!!")
         if not up:
-            return await sendMessage(message, "No Upload Destination specified!")
+            await sendMessage(message, "No Upload Destination specified!")
+            return
         if up != 'gd' and not is_rclone_path(up):
-            return await sendMessage(message, f"Wrong Rclone Upload Destination: {up}")
+            await sendMessage(message, f"Wrong Rclone Upload Destination: {up}")
+            return
     else:
         up = 'leech'
 
@@ -411,8 +411,6 @@ async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech
         await _mirror_leech(client, message, isQbit, isLeech)
     else:
         await category_selection_logic(client, message, isQbit, isLeech)
-
-# --- END OF CUSTOM CATEGORY LOGIC ---
 
 @new_task
 async def wzmlxcb(_, query):
