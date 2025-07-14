@@ -329,21 +329,19 @@ def get_file_category(link, reply_to_message):
         if media.document:
             mime_type = media.document.mime_type or ""
             file_name = (media.document.file_name or "").lower()
-
             if mime_type.startswith('video/'): return 'video'
             if mime_type.startswith('audio/'): return 'audio'
             if mime_type.startswith('image/'): return 'image'
             if any(x in mime_type for x in ['zip', 'x-rar', 'x-7z-compressed']): return 'archive'
             if any(x in mime_type for x in ['pdf', 'msword', 'powerpoint', 'excel', 'text/plain']): return 'document'
             if 'vnd.android.package-archive' in mime_type or 'x-msdownload' in mime_type: return 'application'
-
             if any(file_name.endswith(ext) for ext in VID_EXTS): return 'video'
             if any(file_name.endswith(ext) for ext in AUD_EXTS): return 'audio'
             if any(file_name.endswith(ext) for ext in IMG_EXTS): return 'image'
             if any(file_name.endswith(ext) for ext in DOC_EXTS): return 'document'
             if any(file_name.endswith(ext) for ext in ARC_EXTS): return 'archive'
             if any(file_name.endswith(ext) for ext in APP_EXTS): return 'application'
-
+    
     link_lower = (link or "").lower()
     if is_magnet(link_lower): return 'archive'
     if any(ext in link_lower for ext in VID_EXTS): return 'video'
@@ -352,7 +350,6 @@ def get_file_category(link, reply_to_message):
     if any(ext in link_lower for ext in ARC_EXTS): return 'archive'
     if any(ext in link_lower for ext in APP_EXTS): return 'application'
     if any(ext in link_lower for ext in DOC_EXTS): return 'document'
-
     return 'others'
 
 async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech=False):
@@ -362,7 +359,6 @@ async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech
     else:
         link = ""
         reply_to = message.reply_to_message
-        
         command_parts = message.text.split(' ', 1)
         if len(command_parts) > 1:
             link = command_parts[1].strip()
@@ -386,8 +382,7 @@ async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech
         
         await sendMessage(message, f"✅ Oke! File akan di-mirror ke folder = {category_name}.")
         await _mirror_leech(client, message, isQbit=isQbit, isLeech=isLeech, custom_upload_path=up_path, category_name=category_name)
-
-
+        
 async def wzmlxcb(_, query):
     message = query.message
     user_id = query.from_user.id
