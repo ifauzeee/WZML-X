@@ -403,7 +403,7 @@ async def mirror_leech_callback(client, callback_query):
         LOGGER.error(f"Could not get original message: {e}")
         return await editMessage(message, "Error: Tidak dapat menemukan pesan asli. Harap mulai lagi.")
 
-    await editMessage(message, f"✅ Oke! File akan di-mirror ke folder **{category_key.upper()}**.")
+    await editMessage(message, f"✅ Oke! File akan di-mirror ke folder <b>{category_key.upper()}</b>.")
     await _mirror_leech(client, original_message, isQbit=isQbit, isLeech=isLeech, custom_upload_path=up_path)
 
 
