@@ -1,4 +1,4 @@
-# MODIFIED FOR CATEGORY SELECTION V6 (FINAL LOGIC FIX)
+# FINAL AND FULLY CORRECTED CODE (V7)
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.types import Message
 from pyrogram.filters import command, regex
@@ -125,10 +125,8 @@ async def _mirror_leech(
     ussr = args["-u"] or args["-user"]
     pssw = args["-p"] or args["-pass"]
     thumb = args["-t"] or args["-thumb"]
-    
     sshots_arg = args["-ss"] or args["-screenshots"]
     sshots = int(sshots_arg) if sshots_arg.isdigit() else 0
-
     bulk_start = 0
     bulk_end = 0
     ratio = None
@@ -139,11 +137,7 @@ async def _mirror_leech(
 
     if custom_upload_path:
         up = custom_upload_path
-    
-    if custom_upload_path and is_gdrive_link(f'https://drive.google.com/drive/folders/{custom_upload_path}'):
-    drive_id = custom_upload_path
-    up = 'gd'
-    
+        
     if not isinstance(seed, bool):
         dargs = seed.split(":")
         ratio = dargs[0] or None
@@ -268,26 +262,23 @@ async def _mirror_leech(
         LOGGER.info(link)
 
     if not isLeech:
-        if config_dict["DEFAULT_UPLOAD"] == "rc" and not up or up == "rc":
-            up = config_dict.get("RCLONE_PATH")
-        if not up and config_dict["DEFAULT_UPLOAD"] == "gd":
-            up = "gd"
-            if not drive_id:
-                drive_id, index_link = await open_category_btns(message)
-            if drive_id and not await sync_to_async(GoogleDriveHelper().getFolderData, drive_id):
-                return await sendMessage(message, "Google Drive ID validation failed!!")
-        if up == "gd" and not config_dict.get("GDRIVE_ID") and not drive_id:
-            await sendMessage(message, "GDRIVE_ID not Provided!")
-            return
-        elif not up:
-            await sendMessage(message, "No RClone Destination!")
-            return
-        elif up != 'gd' and not is_rclone_path(up):
-            await sendMessage(message, "Wrong Rclone Upload Destination!")
-            return
+        if custom_upload_path and is_gdrive_link(f'https://drive.google.com/drive/folders/{custom_upload_path}'):
+             drive_id = custom_upload_path
+             up = 'gd'
+        if not up:
+            if config_dict["DEFAULT_UPLOAD"] == "rc":
+                up = config_dict.get("RCLONE_PATH", "")
+            else:
+                up = "gd"
+
+        if up == 'gd' and not drive_id and not config_dict.get('GDRIVE_ID'):
+            return await sendMessage(message, "GDRIVE_ID not Provided!")
+        if not up:
+            return await sendMessage(message, "No Upload Destination specified!")
+        if up != 'gd' and not is_rclone_path(up):
+            return await sendMessage(message, f"Wrong Rclone Upload Destination: {up}")
     else:
         up = 'leech'
-
 
     listener = MirrorLeechListener(message, compress, extract, isQbit, isLeech, tag, select, seed, sameDir, rcf, up, join, drive_id=drive_id, index_link=index_link, source_url=org_link, leech_utils={"screenshots": sshots, "thumb": thumb})
 
@@ -307,7 +298,6 @@ async def _mirror_leech(
             auth = f"{ussr}:{pssw}"
             headers = f"authorization: Basic {b64encode(auth.encode()).decode('ascii')}"
         await add_aria2c_download(link, path, listener, name, headers, ratio, seed_time)
-
 
 # --- START OF CUSTOM CATEGORY LOGIC ---
 
@@ -345,7 +335,6 @@ async def category_selection_logic(client, message: Message, isQbit=False, isLee
         if reply_to.text:
             link = reply_to.text.strip()
         elif reply_to.media:
-            # FIX: Pass user_id to get_tg_link_content
             link = await get_tg_link_content(reply_to, message.from_user.id)
     
     if not link:
@@ -422,6 +411,8 @@ async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech
         await _mirror_leech(client, message, isQbit, isLeech)
     else:
         await category_selection_logic(client, message, isQbit, isLeech)
+
+# --- END OF CUSTOM CATEGORY LOGIC ---
 
 @new_task
 async def wzmlxcb(_, query):
