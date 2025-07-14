@@ -14,6 +14,7 @@ class GdriveStatus:
         self.__gid = gid
         self.__status = status
         self.listener = listener
+        self.message = listener.message  # <-- BARIS INI DITAMBAHKAN KEMBALI
 
     def progress_bar(self):
         return get_progress_bar_string(self)
