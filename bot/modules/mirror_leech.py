@@ -1,5 +1,6 @@
 # MERGED AND CORRECTED CODE
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
+from pyrogram.types import Message
 from pyrogram.filters import command, regex
 from html import escape
 from traceback import format_exc
