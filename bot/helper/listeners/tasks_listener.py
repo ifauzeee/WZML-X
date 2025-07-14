@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from random import choice
 from time import time
 from copy import deepcopy
@@ -87,7 +86,6 @@ from bot.helper.telegram_helper.message_utils import (
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.ext_utils.db_handler import DbManger
 from bot.helper.themes import BotTheme
-
 
 class MirrorLeechListener:
     def __init__(
@@ -573,7 +571,6 @@ class MirrorLeechListener:
             async with download_dict_lock:
                 download_dict[self.uid] = upload_status
             await update_all_messages()
-
             await sync_to_async(drive.upload, up_name, size, self.drive_id)
         elif self.upPath == "ddl":
             size = await get_path_size(up_path)
@@ -665,7 +662,6 @@ class MirrorLeechListener:
                     if len(msg.encode() + fmsg.encode()) > (
                         4000 if len(config_dict["IMAGES"]) == 0 else 1000
                     ):
-
                         if config_dict["SAFE_MODE"]:
                             if self.isSuperGroup:
                                 await sendMessage(
@@ -738,39 +734,22 @@ class MirrorLeechListener:
             if mime_type == "Folder":
                 msg += BotTheme("M_SUBFOLD", Folder=folders)
                 msg += BotTheme("TOTAL_FILES", Files=files)
-            if link or rclonePath and config_dict["RCLONE_SERVE_URL"] and not private:
-                if is_DDL := isinstance(link, dict):
-                    for dlup, dlink in link.items():
-                        buttons.ubutton(BotTheme("DDL_LINK", Serv=dlup), dlink)
-                elif link and (
-                    user_id == OWNER_ID or not config_dict["DISABLE_DRIVE_LINK"]
-                ):
-                    buttons.ubutton(BotTheme("CLOUD_LINK"), link)
-                else:
-                    msg += BotTheme("RCPATH", RCpath=rclonePath)
-                if rclonePath and (RCLONE_SERVE_URL := config_dict["RCLONE_SERVE_URL"]):
-                    remote, path = rclonePath.split(":", 1)
-                    url_path = rutils.quote(f"{path}")
-                    share_url = f"{RCLONE_SERVE_URL}/{remote}/{url_path}"
+            if link and not private:
+                base_name = get_base_name(name)
+                view_link = f"https://drive.google.com/file/d/{link}/view"
+                buttons.ibutton(BotTheme("VIEW_LINK"), view_link, "url")
+                INDEX_URL = self.index_link if self.drive_id else config_dict["INDEX_URL"]
+                if INDEX_URL:
+                    url_path = rutils.quote(f"{base_name}")
+                    share_url = f"{INDEX_URL}/{url_path}"
                     if mime_type == "Folder":
                         share_url += "/"
-                    buttons.ubutton(BotTheme("RCLONE_LINK"), share_url)
-                elif not rclonePath and not is_DDL:
-                    INDEX_URL = (
-                        self.index_link if self.drive_id else config_dict["INDEX_URL"]
-                    )
-                    if INDEX_URL:
-                        url_path = rutils.quote(f"{name}")
-                        share_url = f"{INDEX_URL}/{url_path}"
-                        if mime_type == "Folder":
-                            share_url += "/"
-                            buttons.ubutton(BotTheme("INDEX_LINK_F"), share_url)
-                        else:
-                            buttons.ubutton(BotTheme("INDEX_LINK_D"), share_url)
-                            if mime_type.startswith(("image", "video", "audio")):
-                                share_urls = f"{INDEX_URL}/{url_path}?a=view"
-                                buttons.ubutton(BotTheme("VIEW_LINK"), share_urls)
-
+                        buttons.ibutton(BotTheme("INDEX_LINK_F"), share_url, "url")
+                    else:
+                        buttons.ibutton(BotTheme("INDEX_LINK_D"), share_url, "url")
+                        if mime_type.startswith(("image", "video", "audio")):
+                            share_urls = f"{INDEX_URL}/{url_path}?a=view"
+                            buttons.ibutton(BotTheme("VIEW_LINK"), share_urls, "url")
             else:
                 msg += BotTheme("RCPATH", RCpath=rclonePath)
             msg += BotTheme("M_CC", Tag=self.tag)
