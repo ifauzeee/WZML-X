@@ -1,23 +1,28 @@
 #!/usr/bin/env python3
+from time import time
 from bot.helper.ext_utils.bot_utils import (
-    EngineStatus,
     MirrorStatus,
     get_readable_file_size,
     get_readable_time,
+    get_progress_bar_string,
 )
 
-
 class GdriveStatus:
-    def __init__(self, obj, size, message, gid, status, upload_details):
+    def __init__(self, obj, size, listener, gid, status):
         self.__obj = obj
         self.__size = size
         self.__gid = gid
         self.__status = status
-        self.upload_details = upload_details
-        self.message = message
+        self.listener = listener
+
+    def progress_bar(self):
+        return get_progress_bar_string(self)
+        
+    def progress_message(self):
+        return self.listener._getStatusMessage(self.name(), self.size(), self.gid())
 
     def processed_bytes(self):
-        return get_readable_file_size(self.__obj.processed_bytes)
+        return self.__obj.processed_bytes
 
     def size(self):
         return get_readable_file_size(self.__size)
@@ -36,14 +41,11 @@ class GdriveStatus:
     def gid(self) -> str:
         return self.__gid
 
-    def progress_raw(self):
-        try:
-            return self.__obj.processed_bytes / self.__size * 100
-        except Exception:
-            return 0
-
     def progress(self):
-        return f"{round(self.progress_raw(), 2)}%"
+        try:
+            return f"{round(self.__obj.processed_bytes / self.__size * 100, 2)}%"
+        except:
+            return "0.0%"
 
     def speed(self):
         return f"{get_readable_file_size(self.__obj.speed)}/s"
@@ -52,11 +54,8 @@ class GdriveStatus:
         try:
             seconds = (self.__size - self.__obj.processed_bytes) / self.__obj.speed
             return get_readable_time(seconds)
-        except Exception:
+        except:
             return "-"
 
     def download(self):
         return self.__obj
-
-    def eng(self):
-        return EngineStatus().STATUS_GD
