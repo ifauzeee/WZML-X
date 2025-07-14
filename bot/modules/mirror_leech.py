@@ -1,4 +1,4 @@
-# FINAL MERGED AND CORRECTED CODE (V8)
+# FINAL MERGED AND CORRECTED CODE (V10)
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.types import Message
 from pyrogram.filters import command, regex
@@ -280,6 +280,7 @@ async def _mirror_leech(
     else:
         up = 'leech'
 
+
     listener = MirrorLeechListener(message, compress, extract, isQbit, isLeech, tag, select, seed, sameDir, rcf, up, join, drive_id=drive_id, index_link=index_link, source_url=org_link, leech_utils={"screenshots": sshots, "thumb": thumb})
 
     if file_ is not None:
@@ -316,7 +317,7 @@ def get_file_category(link, reply_to_message):
             if any(x in mime_type for x in ['pdf', 'word', 'powerpoint', 'excel']):
                 return 'files'
     
-    link_lower = link.lower()
+    link_lower = link.lower() if link else ""
     if is_magnet(link_lower): return 'folder'
     if '.apk' in link_lower: return 'app'
     if any(ext in link_lower for ext in ['.mp4', '.mkv', '.webm', '.flv', '.mov']): return 'video'
@@ -335,14 +336,15 @@ async def category_selection_logic(client, message: Message, isQbit=False, isLee
         if reply_to.text:
             link = reply_to.text.strip()
         elif reply_to.media:
-            link = await get_tg_link_content(reply_to, message.from_user.id)
+            # For media, the 'link' is just the message object itself, to be handled by the downloader
+            link = reply_to.text or reply_to.caption or "" # Get text from caption if exists
     
-    if not link:
+    if not link and not (reply_to and reply_to.media):
         command_parts = message.text.split(' ', 1)
         if len(command_parts) > 1:
             link = command_parts[1].strip()
 
-    if not link:
+    if not link and not (reply_to and reply_to.media):
         return await sendMessage(message, "Tidak ada link/file yang valid untuk di-mirror.")
 
     category = get_file_category(link, reply_to)
