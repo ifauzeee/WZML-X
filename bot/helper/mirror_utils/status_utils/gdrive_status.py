@@ -17,11 +17,9 @@ class GdriveStatus:
         self.message = listener.message
 
     def __str__(self):
-        """Mengembalikan representasi string dari status, ini akan dipanggil otomatis."""
         return self.listener._getStatusMessage(self.name(), self.size(), self.gid())
 
     def progress_bar(self):
-        """Membuat string progress bar."""
         return get_progress_bar_string(self)
 
     def processed_bytes(self):
@@ -39,7 +37,8 @@ class GdriveStatus:
             return MirrorStatus.STATUS_CLONING
 
     def name(self):
-        return self.listener.name
+        # DIKEMBALIKAN KE SEMULA: Mengambil nama dari objek unduhan, bukan listener
+        return self.__obj.name
 
     def gid(self) -> str:
         return self.__gid
