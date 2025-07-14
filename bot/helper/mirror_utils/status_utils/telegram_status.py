@@ -18,7 +18,7 @@ class TelegramStatus:
         self.message = listener.message
 
     def progress_bar(self):
-        return get_progress_bar_string(self)
+        return get_progress_bar_string(self.progress())
 
     def processed_bytes(self):
         return self.__obj.processed_bytes if hasattr(self.__obj, 'processed_bytes') else 0
