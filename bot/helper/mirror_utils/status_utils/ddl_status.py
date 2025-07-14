@@ -13,13 +13,15 @@ class DDLStatus:
         self.__size = size
         self.__gid = gid
         self.listener = listener
-        self.message = listener.message # <-- BARIS INI DITAMBAHKAN KEMBALI
+        self.message = listener.message
+
+    def __str__(self):
+        """Mengembalikan representasi string dari status, ini akan dipanggil otomatis."""
+        return self.listener._getStatusMessage(self.name(), self.size(), self.gid())
 
     def progress_bar(self):
+        """Membuat string progress bar."""
         return get_progress_bar_string(self)
-
-    def progress_message(self):
-        return self.listener._getStatusMessage(self.name(), self.size(), self.gid())
 
     def processed_bytes(self):
         return self.__obj.processed_bytes
@@ -28,11 +30,10 @@ class DDLStatus:
         return get_readable_file_size(self.__size)
 
     def status(self):
-        # DDLStatus dalam bot ini tampaknya hanya untuk upload, jadi kita set UPLOADING
         return MirrorStatus.STATUS_UPLOADING
 
     def name(self):
-        return self.__obj.name
+        return self.listener.name
 
     def progress(self):
         try:
