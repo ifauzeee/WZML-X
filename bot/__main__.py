@@ -365,7 +365,7 @@ async def main():
     bot.add_handler(MessageHandler(ytdlp.ytdl, filters=command(BotCommands.YtdlCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(mirror_leech.leech, filters=command(BotCommands.LeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     bot.add_handler(MessageHandler(mirror_leech.qb_leech, filters=command(BotCommands.QbLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
-    bot.add_handler(MessageHandler(ytdlp.ytdl_leech, filters=command(BotCommands.YtdlLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
+    bot.add_handler(MessageHandler(ytdlp.ytdlleech, filters=command(BotCommands.YtdlLeechCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     
     # Add remaining handlers from the .BAK file
     bot.add_handler(MessageHandler(clone.clone, filters=command(BotCommands.CloneCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
