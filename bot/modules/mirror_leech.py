@@ -284,7 +284,7 @@ async def _mirror_leech(
     listener = MirrorLeechListener(message, compress, extract, isQbit, isLeech, tag, select, seed, sameDir, rcf, up, join, drive_id=drive_id, index_link=index_link, source_url=org_link, leech_utils={"screenshots": sshots, "thumb": thumb})
 
     if file_ is not None:
-        await TelegramDownloadHelper(listener).add_download(reply_to, f"{path}/", name)
+        await TelegramDownloadHelper(listener).add_download(reply_to, f"{path}/", name, session, decrypter)
     elif is_rclone_path(link):
         await add_rclone_download(link, config_dict.get("RCLONE_CONFIG"), f"{path}/", name, listener)
     elif is_gdrive_link(link):
