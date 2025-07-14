@@ -67,12 +67,11 @@ from bot.helper.mirror_utils.status_utils.gdrive_status import GdriveStatus
 from bot.helper.mirror_utils.status_utils.telegram_status import TelegramStatus
 from bot.helper.mirror_utils.status_utils.ddl_status import DDLStatus
 from bot.helper.mirror_utils.status_utils.rclone_status import RcloneStatus
-from bot.helper.mirror_utils.status_utils.queue_status import QueueStatus
+from bot.helper.mirror_utils.status_utils.metadata_status import MetadataStatus
 from bot.helper.mirror_utils.upload_utils.gdriveTools import GoogleDriveHelper
 from bot.helper.mirror_utils.upload_utils.pyrogramEngine import TgUploader
 from bot.helper.mirror_utils.upload_utils.ddlEngine import DDLUploader
 from bot.helper.mirror_utils.rclone_utils.transfer import RcloneTransferHelper
-from bot.helper.mirror_utils.status_utils.metadata_status import MetadataStatus
 from bot.helper.telegram_helper.message_utils import (
     sendCustomMsg,
     sendMessage,
@@ -737,22 +736,22 @@ class MirrorLeechListener:
             if link and not private:
                 base_name = get_base_name(name)
                 view_link = f"https://drive.google.com/file/d/{link}/view"
-                buttons.ibutton(BotTheme("VIEW_LINK"), view_link, "url")
+                buttons.ibutton("View Link", view_link, "url")
                 INDEX_URL = self.index_link if self.drive_id else config_dict["INDEX_URL"]
                 if INDEX_URL:
                     url_path = rutils.quote(f"{base_name}")
                     share_url = f"{INDEX_URL}/{url_path}"
                     if mime_type == "Folder":
                         share_url += "/"
-                        buttons.ibutton(BotTheme("INDEX_LINK_F"), share_url, "url")
+                        buttons.ibutton("Index Link", share_url, "url")
                     else:
-                        buttons.ibutton(BotTheme("INDEX_LINK_D"), share_url, "url")
+                        buttons.ibutton("Index Link", share_url, "url")
                         if mime_type.startswith(("image", "video", "audio")):
                             share_urls = f"{INDEX_URL}/{url_path}?a=view"
-                            buttons.ibutton(BotTheme("VIEW_LINK"), share_urls, "url")
+                            buttons.ibutton("View Link (Index)", share_urls, "url")
             else:
                 msg += BotTheme("RCPATH", RCpath=rclonePath)
-            msg += BotTheme("M_CC", Tag=self.tag)
+            msg += BotTheme("M_CC", Tag=self.tag, Extra=config_dict["GD_INFO"])
             message = msg
 
             btns = ButtonMaker()
@@ -896,7 +895,10 @@ class MirrorLeechListener:
 ┠ <b>Due To:</b> {escape(error)}
 ┠ <b>Mode:</b> {self.upload_details['mode']}
 ┖ <b>Elapsed:</b> {get_readable_time(time() - self.message.date.timestamp())}"""
-        await sendMessage(self.message, msg, button)
+        try:
+            await sendMessage(self.message, msg, button)
+        except Exception as e:
+            LOGGER.error(f"Failed to send error message: {e}")
         if count == 0:
             await self.clean()
         else:
@@ -938,7 +940,10 @@ class MirrorLeechListener:
 ┠ <b>Due To:</b> {escape(error)}
 ┠ <b>Mode:</b> {self.upload_details['mode']}
 ┖ <b>Elapsed:</b> {get_readable_time(time() - self.message.date.timestamp())}"""
-        await sendMessage(self.message, msg)
+        try:
+            await sendMessage(self.message, msg)
+        except Exception as e:
+            LOGGER.error(f"Failed to send error message: {e}")
         if count == 0:
             await self.clean()
         else:
