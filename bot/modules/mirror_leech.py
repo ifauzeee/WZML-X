@@ -1,4 +1,4 @@
-# FINAL MERGED AND CORRECTED CODE FOR mirror_leech.py
+# FINAL MERGED AND CORRECTED CODE (V9)
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.types import Message
 from pyrogram.filters import command, regex
@@ -84,7 +84,6 @@ CUSTOM_DESTINATIONS = {
     'files':     '1gxPwlYhbKmzhYSk-ququFUzfBG5cj-lc',
     'folder':    '1E9Ng9uMqJ2yAK8hqirp7EOImSGgKecW6',
 }
-
 
 @new_task
 async def _mirror_leech(
@@ -280,6 +279,7 @@ async def _mirror_leech(
             return
     else:
         up = 'leech'
+
 
     listener = MirrorLeechListener(message, compress, extract, isQbit, isLeech, tag, select, seed, sameDir, rcf, up, join, drive_id=drive_id, index_link=index_link, source_url=org_link, leech_utils={"screenshots": sshots, "thumb": thumb})
 
