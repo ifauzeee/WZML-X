@@ -18,7 +18,7 @@ class GdriveStatus:
         self.message = listener.message
 
     def progress_bar(self):
-        return get_progress_bar_string(self)
+        return get_progress_bar_string(self.progress())
         
     def processed_bytes(self):
         return self.__obj.processed_bytes
@@ -39,7 +39,7 @@ class GdriveStatus:
 
     def gid(self) -> str:
         return self.__gid
-
+        
     def eng(self):
         return EngineStatus().STATUS_GD
 
