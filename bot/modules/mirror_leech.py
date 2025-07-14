@@ -394,7 +394,7 @@ async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech
         
         category_name = CATEGORY_DISPLAY_NAMES.get(category)
         
-        await sendMessage(message, f"✅ Oke! File akan di-mirror ke folder <b>{category_name}</b>.")
+        await sendMessage(message, f"✅ Oke! File akan di-mirror ke folder = <b>{category_name}</b>.")
         await _mirror_leech(client, message, isQbit=isQbit, isLeech=isLeech, custom_upload_path=up_path, category_name=category_name)
 
 
