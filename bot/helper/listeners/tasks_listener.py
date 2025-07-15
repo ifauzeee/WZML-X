@@ -642,7 +642,7 @@ class MirrorLeechListener:
                 if self.isSuperGroup:
                     btn = extra_btns(btn)[0]
                 message = msg
-                btns = btn.build_menu(2)
+                btns = btn.build_menu(1)
                 buttons = btn
                 if self.isSuperGroup and not self.isPM:
                     message += BotTheme("L_LL_MSG")
@@ -656,7 +656,7 @@ class MirrorLeechListener:
                     await sendMessage(
                         self.message,
                         message,
-                        buttons.build_menu(2),
+                        buttons.build_menu(1),
                         photo=self.random_pic,
                     )
                 fmsg = "\n"
@@ -678,7 +678,7 @@ class MirrorLeechListener:
                                 await sendMessage(
                                     self.message,
                                     message + fmsg,
-                                    buttons.build_menu(2),
+                                    buttons.build_menu(1),
                                     photo=self.random_pic,
                                 )
                         else:
@@ -692,7 +692,7 @@ class MirrorLeechListener:
                             await sendMessage(
                                 self.message,
                                 message + fmsg,
-                                buttons.build_menu(2),
+                                buttons.build_menu(1),
                                 photo=self.random_pic,
                             )
                         await sleep(1.5)
@@ -711,7 +711,7 @@ class MirrorLeechListener:
                             await sendMessage(
                                 self.message,
                                 message + fmsg,
-                                buttons.build_menu(2),
+                                buttons.build_menu(1),
                                 photo=self.random_pic,
                             )
                     else:
@@ -721,7 +721,7 @@ class MirrorLeechListener:
                         await sendMessage(
                             self.message,
                             message + fmsg,
-                            buttons.build_menu(2),
+                            buttons.build_menu(1),
                             photo=self.random_pic,
                         )
 
@@ -752,9 +752,9 @@ class MirrorLeechListener:
                 if mime_type == "Folder":
                     share_url += "/"
                 buttons.ubutton(BotTheme("RCLONE_LINK"), share_url)
-            elif link and (config_dict["DISABLE_DRIVE_LINK"] or (user_id == OWNER_ID and not config_dict["DISABLE_DRIVE_LINK"])):
+            elif link and config_dict["DISABLE_DRIVE_LINK"]:
                 INDEX_URL = self.index_link or config_dict["INDEX_URL"]
-                if INDEX_URL and config_dict["DISABLE_DRIVE_LINK"]:
+                if INDEX_URL:
                     file_id = GoogleDriveHelper.getIdFromUrl(link)
                     if mime_type == "Folder":
                         share_url = f"{INDEX_URL}/{rutils.quote(name)}/"
@@ -765,8 +765,6 @@ class MirrorLeechListener:
                         if self.drive_id:
                             view_link = f"{INDEX_URL}/folder/{self.drive_id}/file/{file_id}/{rutils.quote(name)}"
                             buttons.ubutton("👁️‍🗨️ View Link", view_link)
-                else:
-                    buttons.ubutton(BotTheme("CLOUD_LINK"), link)
             elif link:
                 buttons.ubutton(BotTheme("CLOUD_LINK"), link)
             else:
@@ -791,7 +789,7 @@ class MirrorLeechListener:
                         await sendMultiMessage(
                             config_dict["MIRROR_LOG_ID"],
                             message,
-                            m_btns.build_menu(2),
+                            m_btns.build_menu(1),
                             self.random_pic,
                         )
                     ).values()
@@ -836,7 +834,7 @@ class MirrorLeechListener:
                         await sendMessage(
                             self.botpmmsg,
                             message,
-                            buttons.build_menu(2),
+                            buttons.build_menu(1),
                             photo=self.random_pic,
                         )
                         if config_dict["SAVE_MSG"]:
@@ -847,7 +845,7 @@ class MirrorLeechListener:
                         await sendMessage(
                             self.message,
                             message,
-                            s_btn.build_menu(2),
+                            s_btn.build_menu(1),
                             photo=self.random_pic,
                         )
                 else:
@@ -856,7 +854,7 @@ class MirrorLeechListener:
                     await sendMessage(
                         self.message,
                         message,
-                        buttons.build_menu(2),
+                        buttons.build_menu(1),
                         photo=self.random_pic,
                     )
             else:
@@ -869,7 +867,7 @@ class MirrorLeechListener:
                 if config_dict["SAVE_MSG"] and self.isSuperGroup:
                     buttons.ibutton(BotTheme("SAVE_MSG"), "save", "footer")
                 await sendMessage(
-                    self.message, message, buttons.build_menu(2), photo=self.random_pic
+                    self.message, message, buttons.build_menu(1), photo=self.random_pic
                 )
 
             if self.seed:
