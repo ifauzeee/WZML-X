@@ -738,42 +738,43 @@ class MirrorLeechListener:
             if mime_type == "Folder":
                 msg += BotTheme("M_SUBFOLD", Folder=folders)
                 msg += BotTheme("TOTAL_FILES", Files=files)
-            if link or rclonePath and config_dict["RCLONE_SERVE_URL"] and not private:
-                if is_DDL := isinstance(link, dict):
-                    for dlup, dlink in link.items():
-                        buttons.ubutton(BotTheme("DDL_LINK", Serv=dlup), dlink)
-                elif link and (
-                    user_id == OWNER_ID or not config_dict["DISABLE_DRIVE_LINK"]
-                ):
-                    buttons.ubutton(BotTheme("CLOUD_LINK"), link)
-                else:
-                    msg += BotTheme("RCPATH", RCpath=rclonePath)
-                if rclonePath and (RCLONE_SERVE_URL := config_dict["RCLONE_SERVE_URL"]):
-                    remote, path = rclonePath.split(":", 1)
-                    url_path = rutils.quote(f"{path}")
-                    share_url = f"{RCLONE_SERVE_URL}/{remote}/{url_path}"
+
+            # =================================================================
+            # START: RESTRUCTURED LINK BUTTON LOGIC
+            # =================================================================
+            if is_DDL := isinstance(link, dict):
+                for dlup, dlink in link.items():
+                    buttons.ubutton(BotTheme("DDL_LINK", Serv=dlup), dlink)
+            elif rclonePath and (RCLONE_SERVE_URL := config_dict["RCLONE_SERVE_URL"]):
+                remote, path = rclonePath.split(":", 1)
+                url_path = rutils.quote(f"{path}")
+                share_url = f"{RCLONE_SERVE_URL}/{remote}/{url_path}"
+                if mime_type == "Folder":
+                    share_url += "/"
+                buttons.ubutton(BotTheme("RCLONE_LINK"), share_url)
+            elif link and (config_dict["DISABLE_DRIVE_LINK"] or (user_id == OWNER_ID and not config_dict["DISABLE_DRIVE_LINK"])):
+                INDEX_URL = self.index_link or config_dict["INDEX_URL"]
+                if INDEX_URL and config_dict["DISABLE_DRIVE_LINK"]:
+                    file_id = GoogleDriveHelper.getIdFromUrl(link)
                     if mime_type == "Folder":
-                        share_url += "/"
-                    buttons.ubutton(BotTheme("RCLONE_LINK"), share_url)
-                elif not rclonePath and not is_DDL and link:
-                    INDEX_URL = (
-                        self.index_link if self.drive_id else config_dict["INDEX_URL"]
-                    )
-                    if INDEX_URL:
-                        file_id = GoogleDriveHelper.getIdFromUrl(link)
-                        if mime_type == "Folder":
-                            share_url = f"{INDEX_URL}/{rutils.quote(name)}/"
-                            buttons.ubutton(BotTheme("INDEX_LINK_F"), share_url)
-                        else:
-                            # Create the custom download link
-                            dl_link = f"{INDEX_URL}/api/download?fileId={file_id}"
-                            buttons.ubutton("📥 Download Link", dl_link)
-                            # Create the custom view link
+                        share_url = f"{INDEX_URL}/{rutils.quote(name)}/"
+                        buttons.ubutton("🗂 Index Link", share_url)
+                    else:
+                        dl_link = f"{INDEX_URL}/api/download?fileId={file_id}"
+                        buttons.ubutton("📥 Download Link", dl_link)
+                        if self.drive_id:
                             view_link = f"{INDEX_URL}/folder/{self.drive_id}/file/{file_id}/{rutils.quote(name)}"
                             buttons.ubutton("👁️‍🗨️ View Link", view_link)
-
+                else:
+                    buttons.ubutton(BotTheme("CLOUD_LINK"), link)
+            elif link:
+                buttons.ubutton(BotTheme("CLOUD_LINK"), link)
             else:
                 msg += BotTheme("RCPATH", RCpath=rclonePath)
+            # =================================================================
+            # END: RESTRUCTURED LINK BUTTON LOGIC
+            # =================================================================
+
             msg += BotTheme("M_CC", Tag=self.tag)
             message = msg
 
