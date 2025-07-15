@@ -357,18 +357,18 @@ class MirrorLeechListener:
                                     return
                                 elif code != 0:
                                     LOGGER.error("Unable to extract archive splits!")
-                        if (
-                            not self.seed
-                            and self.suproc is not None
-                            and self.suproc.returncode == 0
-                        ):
-                            for file_ in files:
-                                if is_archive_split(file_) or is_archive(file_):
-                                    del_path = ospath.join(dirpath, file_)
-                                    try:
-                                        await aioremove(del_path)
-                                    except Exception:
-                                        return
+                    if (
+                        not self.seed
+                        and self.suproc is not None
+                        and self.suproc.returncode == 0
+                    ):
+                        for file_ in files:
+                            if is_archive_split(file_) or is_archive(file_):
+                                del_path = ospath.join(dirpath, file_)
+                                try:
+                                    await aioremove(del_path)
+                                except Exception:
+                                    return
                 else:
                     if self.seed:
                         self.newDir = f"{self.dir}10000"
@@ -755,21 +755,22 @@ class MirrorLeechListener:
                     if mime_type == "Folder":
                         share_url += "/"
                     buttons.ubutton(BotTheme("RCLONE_LINK"), share_url)
-                elif not rclonePath and not is_DDL:
+                elif not rclonePath and not is_DDL and link:
                     INDEX_URL = (
                         self.index_link if self.drive_id else config_dict["INDEX_URL"]
                     )
                     if INDEX_URL:
-                        url_path = rutils.quote(f"{name}")
-                        share_url = f"{INDEX_URL}/{url_path}"
+                        file_id = GoogleDriveHelper.getIdFromUrl(link)
                         if mime_type == "Folder":
-                            share_url += "/"
+                            share_url = f"{INDEX_URL}/{rutils.quote(name)}/"
                             buttons.ubutton(BotTheme("INDEX_LINK_F"), share_url)
                         else:
-                            buttons.ubutton(BotTheme("INDEX_LINK_D"), share_url)
-                            if mime_type.startswith(("image", "video", "audio")):
-                                share_urls = f"{INDEX_URL}/{url_path}?a=view"
-                                buttons.ubutton(BotTheme("VIEW_LINK"), share_urls)
+                            # Create the custom download link
+                            dl_link = f"{INDEX_URL}/api/download?fileId={file_id}"
+                            buttons.ubutton("📥 Download Link", dl_link)
+                            # Create the custom view link
+                            view_link = f"{INDEX_URL}/folder/{self.drive_id}/file/{file_id}/{rutils.quote(name)}"
+                            buttons.ubutton("👁️‍🗨️ View Link", view_link)
 
             else:
                 msg += BotTheme("RCPATH", RCpath=rclonePath)
