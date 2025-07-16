@@ -62,7 +62,6 @@ from bot.helper.telegram_helper.message_utils import (
     auto_delete_message,
     open_category_btns,
     open_dump_btns,
-    _get_filename_from_msg,  # Pastikan ini bisa diimpor
 )
 from bot.helper.listeners.tasks_listener import MirrorLeechListener
 from bot.helper.ext_utils.help_messages import (
@@ -405,7 +404,6 @@ async def _mirror_leech(
                 if is_cancelled:
                     await delete_links(message)
                     return
-            
             if drive_id and not await sync_to_async(
                 GoogleDriveHelper().getFolderData, drive_id
             ):
@@ -468,25 +466,6 @@ async def _mirror_leech(
             await sendMessage(message, up)
             await delete_links(message)
             return
-    
-    # =========================================================================
-    # LOKASI BARU UNTUK PESAN KONFIRMASI (BERJALAN UNTUK SEMUA TUGAS)
-    # =========================================================================
-    if not isLeech: # Hanya kirim pesan untuk mirror, bukan leech
-        # Dapatkan nama folder tujuan
-        folder_name_display = "Folder Default"
-        if drive_id:
-            folder_name_display = next((name for name, data in categories_dict.items() if data['drive_id'] == drive_id), folder_name_display)
-        
-        # Dapatkan nama file
-        file_name = await _get_filename_from_msg(message)
-        
-        if file_name:
-            await sendMessage(message, f"✅ Oke! File <b><code>{escape(file_name)}</code></b> akan di-mirror ke folder 💿 <b>{folder_name_display}</b>.")
-        else:
-            await sendMessage(message, f"✅ Oke! File akan di-mirror ke folder 💿 <b>{folder_name_display}</b>.")
-        await sleep(1) # Jeda singkat
-    # =========================================================================
 
     listener = MirrorLeechListener(
         message,
