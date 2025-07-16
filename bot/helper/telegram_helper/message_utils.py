@@ -476,6 +476,7 @@ async def open_category_btns(message):
     msg_id = message.id
     buttons = ButtonMaker()
     _tick = True
+    cat_name = ""
     if len(utds := await fetch_user_tds(user_id)) > 1:
         for _name in utds.keys():
             buttons.ibutton(
@@ -505,12 +506,25 @@ async def open_category_btns(message):
         await sleep(0.5)
         if bot_cache[msg_id][2] or bot_cache[msg_id][3]:
             break
-    drive_id, index_link, _, is_cancelled, __ = bot_cache[msg_id]
+    drive_id, index_link, _, is_cancelled, __ = bot_cache.pop(msg_id)
     if not is_cancelled:
-        await deleteMessage(prompt)
+        # ---- PERUBAHAN DI SINI ----
+        # Kita tidak lagi menghapus pesan tombol, tapi mengeditnya menjadi pesan konfirmasi.
+        if drive_id:
+             final_cat_name = next((name for name, data in categories_dict.items() if data['drive_id'] == drive_id), 'Folder Pilihan')
+        else:
+            final_cat_name = cat_name # Fallback ke nama yang dipilih pertama
+            
+        file_name = await _get_filename_from_msg(message)
+        if file_name:
+            conf_msg = f"✅ Oke! File <b><code>{escape(file_name)}</code></b> akan di-mirror ke folder 💿 <b>{final_cat_name}</b>."
+        else:
+            conf_msg = f"✅ Oke! File akan di-mirror ke folder 💿 <b>{final_cat_name}</b>."
+        await editMessage(prompt, conf_msg)
+        # ------------------------
     else:
         await editMessage(prompt, "<b>Task Cancelled</b>")
-    del bot_cache[msg_id]
+    
     return drive_id, index_link, is_cancelled
 
 
