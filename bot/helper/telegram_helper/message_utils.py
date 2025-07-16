@@ -55,24 +55,19 @@ from bot.helper.ext_utils.exceptions import TgLinkException
 async def _get_filename_from_msg(message):
     """Mencoba mendapatkan nama file dari pesan asli."""
     if reply := message.reply_to_message:
-        # Jika pesan adalah balasan ke file media
         if file_obj := getattr(reply, reply.media.value, None):
             return getattr(file_obj, "file_name", None)
-        # Jika pesan adalah balasan ke teks (kemungkinan berisi link)
         elif reply.text:
             from urllib.parse import unquote
             from os.path import basename
             link = reply.text.split('\n', 1)[0].strip()
             if link:
-                # Mengambil nama file dari bagian akhir URL
                 return unquote(basename(link.split("?")[0]))
-    # Jika link ada di dalam teks perintah itu sendiri
     elif " " in message.text:
         from urllib.parse import unquote
         from os.path import basename
         link = message.text.split(" ", 1)[1].strip()
         if link:
-            # Mengambil nama file dari bagian akhir URL
             return unquote(basename(link.split("?")[0]))
     return None
 
