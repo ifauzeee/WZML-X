@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.types import Message
 from pyrogram.filters import command, regex
@@ -9,6 +11,7 @@ from asyncio import sleep, wrap_future
 from aiofiles import open as aiopen
 from aiofiles.os import path as aiopath
 from cloudscraper import create_scraper
+from urllib.parse import unquote # Ditambahkan untuk mem-parsing nama file dari URL
 
 from bot import (
     bot,
@@ -79,7 +82,7 @@ CUSTOM_DESTINATIONS = {
     'image':       '1Ma-Zw9aTY62csTGJlLHojWO-RSG2cCPY',
     'document':    '1xS5BoYrHEHE145zhBgEzZmH3Pbqk5Fyg',
     'audio':       '1nrJhp_iPhqq8yJqjgT4TgM5r-yvSRj6o',
-    'video':       '1tKXmbfClZlpFi3NhXvM0aY2fJLk4Aw5R', # Diambil dari config lama, harap ganti jika perlu
+    'video':       '1tKXmbfClZlpFi3NhXvM0aY2fJLk4Aw5R',
     'archive':     '10ME4IfXdluY_23NKUcybu4Zbi__h40fR',
     'application': '1I45We4iE9z2R6-VW1LW2eo6asPNhTk13',
     'others':      '1WsTfhh0DEZmF5ehNfftX4jFQmSbB_KOb',
@@ -374,34 +377,51 @@ def get_file_category(link, reply_to_message):
     # Default jika tidak ada kategori yang cocok
     return 'others'
 
+# ===================================================================================================
+# FUNGSI INI TELAH DIMODIFIKASI UNTUK MENAMPILKAN NAMA FILE
+# ===================================================================================================
 async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech=False):
     """
     Fungsi entri utama yang menentukan kategori sebelum memanggil logika mirror/leech.
     """
     text_args = message.text.split()
-    # Jika ada argumen manual, gunakan logika lama
+    # Jika ada argumen manual (-s, -up, dll.), gunakan logika lama tanpa kategori otomatis.
     if any(arg in ['-s', '-select', '-up', '-samedir', '-sd', '-m', '-id'] for arg in text_args):
         await _mirror_leech(client, message, isQbit, isLeech)
     else:
-        # Logika otomatisasi kategori
+        # --- Logika Otomatisasi Kategori ---
         link = ""
         reply_to = message.reply_to_message
-        
+        file_display_name = ""
+
         # Ekstrak link dari teks perintah atau dari pesan yang dibalas
         command_parts = message.text.split(' ', 1)
         if len(command_parts) > 1:
             link = command_parts[1].strip()
         elif reply_to and reply_to.text:
             link = reply_to.text.strip().split('\n', 1)[0]
-        elif reply_to and reply_to.media:
-            # Link bisa kosong jika ini adalah file, tidak apa-apa
-            pass
 
+        # Prioritas 1: Dapatkan nama file dari media yang dibalas (paling akurat)
+        if reply_to and reply_to.media:
+            media = getattr(reply_to, reply_to.media.value)
+            if hasattr(media, 'file_name') and media.file_name:
+                file_display_name = media.file_name
+        
+        # Prioritas 2: Jika tidak ada media, coba ekstrak nama file dari link
+        if not file_display_name and link:
+            # Menggunakan unquote untuk menangani karakter URL-encoded (misal: %20)
+            # Membersihkan dari parameter query (?...)
+            cleaned_link = link.split('?')[0]
+            if '/' in cleaned_link:
+                # Mengambil bagian terakhir dari path URL
+                file_display_name = unquote(cleaned_link.split('/')[-1])
+
+        # Pemeriksaan jika tidak ada link atau file yang valid untuk diproses
         if not link and not (reply_to and reply_to.media):
             await sendMessage(message, "Tidak ada link atau file yang valid untuk di-mirror.")
             return
 
-        # Dapatkan kategori dan path upload kustom
+        # Dapatkan kategori file dan path tujuan upload
         category = get_file_category(link, reply_to)
         up_path = CUSTOM_DESTINATIONS.get(category)
         
@@ -409,8 +429,16 @@ async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech
             await sendMessage(message, "Kategori tidak dapat ditentukan atau tidak valid!")
             return
         
-        # Kirim pesan konfirmasi dan mulai proses
-        await sendMessage(message, f"✅ Oke! File akan di-mirror ke folder <b>{CATEGORY_DISPLAY_NAMES[category]}</b>.")
+        # Buat pesan konfirmasi, sertakan nama file jika berhasil didapatkan
+        if file_display_name:
+            # Gunakan html.escape() untuk keamanan jika nama file mengandung karakter HTML
+            confirmation_message = f"✅ Oke! File <b>({escape(file_display_name)})</b> akan di-mirror ke folder <b>{CATEGORY_DISPLAY_NAMES[category]}</b>."
+        else:
+            # Pesan fallback jika nama file tidak dapat diekstrak
+            confirmation_message = f"✅ Oke! File akan di-mirror ke folder <b>{CATEGORY_DISPLAY_NAMES[category]}</b>."
+        
+        # Kirim pesan konfirmasi dan mulai proses mirror/leech
+        await sendMessage(message, confirmation_message)
         await _mirror_leech(client, message, isQbit=isQbit, isLeech=isLeech, custom_upload_path=up_path)
 
 
