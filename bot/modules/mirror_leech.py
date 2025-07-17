@@ -611,10 +611,11 @@ async def wzmlxcb(_, query):
             if message.reply_to_message.reply_to_message:
                 await deleteMessage(message.reply_to_message.reply_to_message)
 
+# Handler dengan perintah eksplisit untuk menghindari AttributeError
 bot.add_handler(
     MessageHandler(
         mirror,
-        filters=command([BotCommands.MirrorCommand, "m"])  # Tambahkan alias /m
+        filters=command(["mirror", "m"])  # Perintah eksplisit
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
@@ -622,7 +623,7 @@ bot.add_handler(
 bot.add_handler(
     MessageHandler(
         qb_mirror,
-        filters=command(BotCommands.QbMirrorCommand)
+        filters=command(["qbmirror"])
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
@@ -630,7 +631,7 @@ bot.add_handler(
 bot.add_handler(
     MessageHandler(
         leech,
-        filters=command(BotCommands.LeechCommand)
+        filters=command(["leech"])
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
@@ -638,7 +639,7 @@ bot.add_handler(
 bot.add_handler(
     MessageHandler(
         qb_leech,
-        filters=command(BotCommands.QbLeechCommand)
+        filters=command(["qbleech"])
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
@@ -646,7 +647,7 @@ bot.add_handler(
 bot.add_handler(
     MessageHandler(
         clone,
-        filters=command(BotCommands.CloneCommand)
+        filters=command(["clone"])
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
