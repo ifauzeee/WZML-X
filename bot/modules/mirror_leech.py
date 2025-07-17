@@ -100,7 +100,7 @@ def get_file_category(link, reply_to_message):
     Folder hanya masuk ke kategori 'others'.
     """
     IMG_EXTS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']
-    DOC_EXTS = ['.pdf', '.docx', '.doc', '.txt', '.ppt', '.pptx', '.xls', '.xlsx', '.rtf', '.csv']
+    DOC_EXTS = ['.pdf', '.docx', '.doc', '.txt', '.ppt', '.pptx', '.xls', '.xlsx', '.rtf', '.csv', '.py']  # Tambahkan .py
     AUD_EXTS = ['.mp3', '.wav', '.ogg', '.flac', '.m4a']
     VID_EXTS = ['.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.webm']
     ARC_EXTS = ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2']
@@ -134,7 +134,7 @@ def get_file_category(link, reply_to_message):
             if mime_type.startswith('audio/'): return 'audio'
             if mime_type.startswith('image/'): return 'image'
             if any(x in mime_type for x in ['zip', 'x-rar', 'x-7z-compressed']): return 'archive'
-            if any(x in mime_type for x in ['pdf', 'msword', 'powerpoint', 'excel', 'text/plain']): return 'document'
+            if any(x in mime_type for x in ['pdf', 'msword', 'powerpoint', 'excel', 'text/plain', 'text/x-python']): return 'document'  # Tambahkan text/x-python
             if 'vnd.android.package-archive' in mime_type or 'x-msdownload' in mime_type: return 'application'
 
             if any(file_name.endswith(ext) for ext in VID_EXTS): return 'video'
