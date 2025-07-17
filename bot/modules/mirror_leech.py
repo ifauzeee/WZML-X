@@ -100,7 +100,7 @@ def get_file_category(link, reply_to_message):
     Folder hanya masuk ke kategori 'others'.
     """
     IMG_EXTS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']
-    DOC_EXTS = ['.pdf', '.docx', '.doc', '.txt', '.ppt', '.pptx', '.xls', '.xlsx', '.rtf', '.csv', '.py']  # Tambahkan .py
+    DOC_EXTS = ['.pdf', '.docx', '.doc', '.txt', '.ppt', '.pptx', '.xls', '.xlsx', '.rtf', '.csv', '.py']
     AUD_EXTS = ['.mp3', '.wav', '.ogg', '.flac', '.m4a']
     VID_EXTS = ['.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.webm']
     ARC_EXTS = ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2']
@@ -112,10 +112,10 @@ def get_file_category(link, reply_to_message):
             folder_id = GoogleDriveHelper.getIdFromUrl(link)
             folder_data = GoogleDriveHelper().getFolderData(folder_id)
             if folder_data and folder_data['mimeType'] == 'application/vnd.google-apps.folder':
-                return 'others'  # Folder hanya masuk ke 'others'
+                return 'others'
         except Exception as e:
             LOGGER.error(f"Error checking Google Drive folder: {e}")
-            return None  # Jika gagal, kembalikan None untuk penanganan error
+            return None
 
     # Prioritas 2: Analisis media dari pesan yang dibalas
     media = reply_to_message
@@ -134,7 +134,7 @@ def get_file_category(link, reply_to_message):
             if mime_type.startswith('audio/'): return 'audio'
             if mime_type.startswith('image/'): return 'image'
             if any(x in mime_type for x in ['zip', 'x-rar', 'x-7z-compressed']): return 'archive'
-            if any(x in mime_type for x in ['pdf', 'msword', 'powerpoint', 'excel', 'text/plain', 'text/x-python']): return 'document'  # Tambahkan text/x-python
+            if any(x in mime_type for x in ['pdf', 'msword', 'powerpoint', 'excel', 'text/plain', 'text/x-python']): return 'document'
             if 'vnd.android.package-archive' in mime_type or 'x-msdownload' in mime_type: return 'application'
 
             if any(file_name.endswith(ext) for ext in VID_EXTS): return 'video'
@@ -154,6 +154,36 @@ def get_file_category(link, reply_to_message):
     if any(ext in link_lower for ext in APP_EXTS): return 'application'
     if any(ext in link_lower for ext in DOC_EXTS): return 'document'
 
+    # Prioritas 4: Ambil metadata dari tautan jika tidak ada ekstensi
+    if link and is_url(link):
+        try:
+            scraper = create_scraper()
+            response = scraper.head(link, allow_redirects=True)
+            content_type = response.headers.get('Content-Type', '')
+            content_disposition = response.headers.get('Content-Disposition', '')
+            file_name = ""
+            if content_disposition and 'filename=' in content_disposition.lower():
+                file_name = unquote(content_disposition.split('filename=')[1].strip('"\'')).lower()
+            elif link_lower.split('/')[-1]:
+                file_name = unquote(link_lower.split('/')[-1])
+
+            if any(file_name.endswith(ext) for ext in VID_EXTS): return 'video'
+            if any(file_name.endswith(ext) for ext in AUD_EXTS): return 'audio'
+            if any(file_name.endswith(ext) for ext in IMG_EXTS): return 'image'
+            if any(file_name.endswith(ext) for ext in ARC_EXTS): return 'archive'
+            if any(file_name.endswith(ext) for ext in APP_EXTS): return 'application'
+            if any(file_name.endswith(ext) for ext in DOC_EXTS): return 'document'
+
+            if content_type.startswith('video/'): return 'video'
+            if content_type.startswith('audio/'): return 'audio'
+            if content_type.startswith('image/'): return 'image'
+            if any(x in content_type for x in ['zip', 'x-rar', 'x-7z-compressed']): return 'archive'
+            if any(x in content_type for x in ['pdf', 'msword', 'powerpoint', 'excel', 'text/plain', 'text/x-python']): return 'document'
+            if 'vnd.android.package-archive' in content_type or 'x-msdownload' in content_type: return 'application'
+        except Exception as e:
+            LOGGER.error(f"Error fetching metadata for link {link}: {e}")
+            return None
+
     # Jika bukan folder dan tidak ada kategori yang cocok, kembalikan None
     return None
 
@@ -165,7 +195,7 @@ async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech
     """
     text_args = message.text.split()
     cmd = text_args[0].split("@")[0].lower()
-    is_clone = 'clone' in cmd  # Deteksi perintah /clone
+    is_clone = 'clone' in cmd
 
     # Jika ada argumen manual, gunakan logika lama
     if any(arg in ['-s', '-select', '-up', '-samedir', '-sd', '-m', '-id'] for arg in text_args):
@@ -187,11 +217,26 @@ async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech
         media = getattr(reply_to, reply_to.media.value)
         if hasattr(media, 'file_name') and media.file_name:
             file_display_name = media.file_name
+    elif reply_to and reply_to.text:
+        # Coba ekstrak nama file dari pesan balasan jika ada
+        text_lines = reply_to.text.strip().split('\n')
+        if len(text_lines) > 1 and not is_url(text_lines[-1]):
+            file_display_name = text_lines[-1].strip()
 
     if not file_display_name and link:
         cleaned_link = link.split('?')[0]
         if '/' in cleaned_link:
             file_display_name = unquote(cleaned_link.split('/')[-1])
+        # Coba ambil nama file dari metadata jika masih kosong
+        if not file_display_name and is_url(link):
+            try:
+                scraper = create_scraper()
+                response = scraper.head(link, allow_redirects=True)
+                content_disposition = response.headers.get('Content-Disposition', '')
+                if content_disposition and 'filename=' in content_disposition.lower():
+                    file_display_name = unquote(content_disposition.split('filename=')[1].strip('"\''))
+            except Exception as e:
+                LOGGER.error(f"Error fetching file name from link {link}: {e}")
 
     if not link and not (reply_to and reply_to.media):
         await sendMessage(message, "Tidak ada link atau file yang valid untuk di-mirror.")
@@ -569,7 +614,7 @@ async def wzmlxcb(_, query):
 bot.add_handler(
     MessageHandler(
         mirror,
-        filters=command(BotCommands.MirrorCommand)
+        filters=command([BotCommands.MirrorCommand, "m"])  # Tambahkan alias /m
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
