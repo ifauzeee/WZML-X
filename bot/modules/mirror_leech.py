@@ -75,7 +75,7 @@ from bot.modules.gen_pyro_sess import get_decrypt_key
 # --- CUSTOM FOLDER IDs ---
 CUSTOM_DESTINATIONS = {
     'image':       '1Ma-Zw9aTY62csTGJlLHojWO-RSG2cCPY',
-    'document':    '1xS5BoYrHEHE145zhBgEzZmH3Pbqk5Fyg',  # Diperbaiki dari '1x°
+    'document':    '1xS5BoYrHEHE145zhBgEzZmH3Pbqk5Fyg',
     'audio':       '1nrJhp_iPhqq8yJqjgT4TgM5r-yvSRj6o',
     'video':       '1tKXmbfClZlpFi3NhXvM0aY2fJLk4Aw5R',
     'archive':     '10ME4IfXdluY_23NKUcybu4Zbi__h40fR',
@@ -106,7 +106,7 @@ def get_file_category(link, reply_to_message):
     ARC_EXTS = ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2']
     APP_EXTS = ['.apk', '.exe', '.iso', '.dmg']
 
-    # Prioritas 1: Ccek apakah tautan adalah folder Google Drive
+    # Prioritas 1: Cek apakah tautan adalah folder Google Drive
     if link and is_gdrive_link(link):
         try:
             folder_id = GoogleDriveHelper.getIdFromUrl(link)
@@ -242,7 +242,7 @@ async def _mirror_leech(
         "-t": "", "-thumb": "",
     }
 
-    args = arg_parser(input_list ⁼1:], arg_base)
+    args = arg_parser(input_list[1:], arg_base)
     cmd = input_list[0].split("@")[0]
     multi = int(args["-i"]) if args["-i"].isdigit() else 0
     link = args["link"]
