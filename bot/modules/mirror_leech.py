@@ -11,7 +11,7 @@ from asyncio import sleep, wrap_future
 from aiofiles import open as aiopen
 from aiofiles.os import path as aiopath
 from cloudscraper import create_scraper
-from urllib.parse import unquote # Ditambahkan untuk mem-parsing nama file dari URL
+from urllib.parse import unquote
 
 from bot import (
     bot,
@@ -47,12 +47,8 @@ from bot.helper.mirror_utils.download_utils.mega_download import add_mega_downlo
 from bot.helper.mirror_utils.download_utils.rclone_download import add_rclone_download
 from bot.helper.mirror_utils.rclone_utils.list import RcloneList
 from bot.helper.mirror_utils.upload_utils.gdriveTools import GoogleDriveHelper
-from bot.helper.mirror_utils.download_utils.direct_link_generator import (
-    direct_link_generator,
-)
-from bot.helper.mirror_utils.download_utils.telegram_download import (
-    TelegramDownloadHelper,
-)
+from bot.helper.mirror_utils.download_utils.direct_link_generator import direct_link_generator
+from bot.helper.mirror_utils.download_utils.telegram_download import TelegramDownloadHelper
 from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.filters import CustomFilters
 from bot.helper.telegram_helper.button_build import ButtonMaker
@@ -77,10 +73,11 @@ from bot.helper.ext_utils.help_messages import (
 from bot.modules.gen_pyro_sess import get_decrypt_key
 
 # --- CUSTOM FOLDER IDs ---
-# Tautan Google Drive dikonversi ke ID Folder untuk setiap kategori.
 CUSTOM_DESTINATIONS = {
     'image':       '1Ma-Zw9aTY62csTGJlLHojWO-RSG2cCPY',
-    'document':    '1xS5BoYrHEHE145zhBgEzZmH3Pbqk5Fyg',
+    'document':    '1x°
+
+S5BoYrHEHE145zhBgEzZmH3Pbqk5Fyg',
     'audio':       '1nrJhp_iPhqq8yJqjgT4TgM5r-yvSRj6o',
     'video':       '1tKXmbfClZlpFi3NhXvM0aY2fJLk4Aw5R',
     'archive':     '10ME4IfXdluY_23NKUcybu4Zbi__h40fR',
@@ -89,7 +86,6 @@ CUSTOM_DESTINATIONS = {
 }
 
 # --- CATEGORY DISPLAY NAMES ---
-# Nama tampilan untuk setiap kategori yang akan ditampilkan ke pengguna.
 CATEGORY_DISPLAY_NAMES = {
     'image': '🖼️ Gambar',
     'document': '📄 Dokumen',
@@ -99,6 +95,137 @@ CATEGORY_DISPLAY_NAMES = {
     'application': '💿 Aplikasi',
     'others': '📂 Lainnya',
 }
+
+def get_file_category(link, reply_to_message):
+    """
+    Menentukan kategori file atau folder berdasarkan MIME type, ekstensi, atau jenis tautan.
+    Folder hanya masuk ke kategori 'others'.
+    """
+    IMG_EXTS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']
+    DOC_EXTS = ['.pdf', '.docx', '.doc', '.txt', '.ppt', '.pptx', '.xls', '.xlsx', '.rtf', '.csv']
+    AUD_EXTS = ['.mp3', '.wav', '.ogg', '.flac', '.m4a']
+    VID_EXTS = ['.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.webm']
+    ARC_EXTS = ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2']
+    APP_EXTS = ['.apk', '.exe', '.iso', '.dmg']
+
+    # Prioritas 1: Cek apakah tautan adalah folder Google Drive
+    if link and is_gdrive_link(link):
+        try:
+            folder_id = GoogleDriveHelper.getIdFromUrl(link)
+            folder_data = GoogleDriveHelper().getFolderData(folder_id)
+            if folder_data and folder_data['mimeType'] == 'application/vnd.google-apps.folder':
+                return 'others'  # Folder hanya masuk ke 'others'
+        except Exception as e:
+            LOGGER.error(f"Error checking Google Drive folder: {e}")
+            return None  # Jika gagal, kembalikan None untuk penanganan error
+
+    # Prioritas 2: Analisis media dari pesan yang dibalas
+    media = reply_to_message
+    if media:
+        if media.photo:
+            return 'image'
+        if media.video:
+            return 'video'
+        if media.audio or media.voice:
+            return 'audio'
+        if media.document:
+            mime_type = media.document.mime_type or ""
+            file_name = (media.document.file_name or "").lower()
+
+            if mime_type.startswith('video/'): return 'video'
+            if mime_type.startswith('audio/'): return 'audio'
+            if mime_type.startswith('image/'): return 'image'
+            if any(x in mime_type for x in ['zip', 'x-rar', 'x-7z-compressed']): return 'archive'
+            if any(x in mime_type for x in ['pdf', 'msword', 'powerpoint', 'excel', 'text/plain']): return 'document'
+            if 'vnd.android.package-archive' in mime_type or 'x-msdownload' in mime_type: return 'application'
+
+            if any(file_name.endswith(ext) for ext in VID_EXTS): return 'video'
+            if any(file_name.endswith(ext) for ext in AUD_EXTS): return 'audio'
+            if any(file_name.endswith(ext) for ext in IMG_EXTS): return 'image'
+            if any(file_name.endswith(ext) for ext in DOC_EXTS): return 'document'
+            if any(file_name.endswith(ext) for ext in ARC_EXTS): return 'archive'
+            if any(file_name.endswith(ext) for ext in APP_EXTS): return 'application'
+
+    # Prioritas 3: Analisis ekstensi dari link
+    link_lower = (link or "").lower()
+    if is_magnet(link_lower): return 'archive'
+    if any(ext in link_lower for ext in VID_EXTS): return 'video'
+    if any(ext in link_lower for ext in AUD_EXTS): return 'audio'
+    if any(ext in link_lower for ext in IMG_EXTS): return 'image'
+    if any(ext in link_lower for ext in ARC_EXTS): return 'archive'
+    if any(ext in link_lower for ext in APP_EXTS): return 'application'
+    if any(ext in link_lower for ext in DOC_EXTS): return 'document'
+
+    # Jika bukan folder dan tidak ada kategori yang cocok, kembalikan None
+    return None
+
+@new_task
+async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech=False):
+    """
+    Fungsi entri utama yang menentukan kategori sebelum memanggil logika mirror/leech.
+    Folder hanya masuk ke 'others', file tanpa kategori ditolak.
+    """
+    text_args = message.text.split()
+    cmd = text_args[0].split("@")[0].lower()
+    is_clone = 'clone' in cmd  # Deteksi perintah /clone
+
+    # Jika ada argumen manual, gunakan logika lama
+    if any(arg in ['-s', '-select', '-up', '-samedir', '-sd', '-m', '-id'] for arg in text_args):
+        await _mirror_leech(client, message, isQbit, isLeech)
+        return
+
+    # Ekstrak link dan nama file
+    link = ""
+    reply_to = message.reply_to_message
+    file_display_name = ""
+
+    command_parts = message.text.split(' ', 1)
+    if len(command_parts) > 1:
+        link = command_parts[1].strip()
+    elif reply_to and reply_to.text:
+        link = reply_to.text.strip().split('\n', 1)[0]
+
+    if reply_to and reply_to.media:
+        media = getattr(reply_to, reply_to.media.value)
+        if hasattr(media, 'file_name') and media.file_name:
+            file_display_name = media.file_name
+
+    if not file_display_name and link:
+        cleaned_link = link.split('?')[0]
+        if '/' in cleaned_link:
+            file_display_name = unquote(cleaned_link.split('/')[-1])
+
+    if not link and not (reply_to and reply_to.media):
+        await sendMessage(message, "Tidak ada link atau file yang valid untuk di-mirror.")
+        return
+
+    # Dapatkan kategori
+    category = get_file_category(link, reply_to)
+
+    # Khusus untuk /clone, hanya izinkan folder (kategori 'others')
+    if is_clone and category != 'others':
+        await sendMessage(message, "Perintah /clone hanya dapat digunakan untuk folder Google Drive!")
+        return
+
+    if not category:
+        await sendMessage(message, "File tidak dapat dikategorikan. Silakan gunakan argumen manual (-up, -id) atau pastikan input adalah folder untuk kategori 'Lainnya'.")
+        return
+
+    up_path = CUSTOM_DESTINATIONS.get(category)
+    if not up_path:
+        await sendMessage(message, "Kategori tidak valid!")
+        return
+
+    # Buat pesan konfirmasi
+    if is_clone:
+        confirmation_message = f"✅ Oke! Folder akan di-clone ke folder <b>{CATEGORY_DISPLAY_NAMES[category]}</b>."
+    elif file_display_name:
+        confirmation_message = f"✅ Oke! File <b>{escape(file_display_name)}</b> akan di-mirror ke folder <b>{CATEGORY_DISPLAY_NAMES[category]}</b>."
+    else:
+        confirmation_message = f"✅ Oke! File akan di-mirror ke folder <b>{CATEGORY_DISPLAY_NAMES[category]}</b>."
+
+    await sendMessage(message, confirmation_message)
+    await _mirror_leech(client, message, isQbit=isQbit, isLeech=isLeech, custom_upload_path=up_path)
 
 @new_task
 async def _mirror_leech(
@@ -149,7 +276,7 @@ async def _mirror_leech(
     file_ = None
     session = ""
     decrypter = None
-        
+
     if not isinstance(seed, bool):
         dargs = seed.split(":")
         ratio = dargs[0] or None
@@ -220,18 +347,18 @@ async def _mirror_leech(
     __run_multi()
 
     path = f"{DOWNLOAD_DIR}{message.id}{folder_name}"
-    
+
     sender_chat = message.sender_chat
     if sender_chat:
         tag = sender_chat.title
     else:
         tag = message.from_user.mention
-    
+
     reply_to = message.reply_to_message
     if not link and reply_to:
         if reply_to.text:
             link = reply_to.text.split("\n", 1)[0].strip()
-            
+
     if link and is_telegram_link(link):
         try:
             reply_to, session = await get_tg_link_content(link, message.from_user.id)
@@ -320,127 +447,20 @@ async def _mirror_leech(
             headers = f"authorization: Basic {b64encode(auth.encode()).decode('ascii')}"
         await add_aria2c_download(link, path, listener, name, headers, ratio, seed_time)
 
-# --- START OF CUSTOM CATEGORY LOGIC ---
+async def mirror(client, message):
+    await run_mirror_leech_entry(client, message)
 
-def get_file_category(link, reply_to_message):
-    """
-    Menentukan kategori file berdasarkan MIME type atau ekstensi.
-    Memprioritaskan data dari replied message untuk akurasi yang lebih tinggi.
-    """
-    # Definisi ekstensi untuk setiap kategori
-    IMG_EXTS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']
-    DOC_EXTS = ['.pdf', '.docx', '.doc', '.txt', '.ppt', '.pptx', '.xls', '.xlsx', '.rtf', '.csv']
-    AUD_EXTS = ['.mp3', '.wav', '.ogg', '.flac', '.m4a']
-    VID_EXTS = ['.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.webm']
-    ARC_EXTS = ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2']
-    APP_EXTS = ['.apk', '.exe', '.iso', '.dmg']
+async def qb_mirror(client, message):
+    await run_mirror_leech_entry(client, message, isQbit=True)
 
-    media = reply_to_message
-    if media:
-        # Prioritas 1: Analisis media dari pesan yang dibalas (lebih akurat)
-        if media.photo:
-            return 'image'
-        if media.video:
-            return 'video'
-        if media.audio or media.voice:
-            return 'audio'
-        if media.document:
-            mime_type = media.document.mime_type or ""
-            file_name = (media.document.file_name or "").lower()
+async def leech(client, message):
+    await run_mirror_leech_entry(client, message, isLeech=True)
 
-            # Analisis berdasarkan MIME type
-            if mime_type.startswith('video/'): return 'video'
-            if mime_type.startswith('audio/'): return 'audio'
-            if mime_type.startswith('image/'): return 'image'
-            if any(x in mime_type for x in ['zip', 'x-rar', 'x-7z-compressed']): return 'archive'
-            if any(x in mime_type for x in ['pdf', 'msword', 'powerpoint', 'excel', 'text/plain']): return 'document'
-            if 'vnd.android.package-archive' in mime_type or 'x-msdownload' in mime_type: return 'application'
+async def qb_leech(client, message):
+    await run_mirror_leech_entry(client, message, isQbit=True, isLeech=True)
 
-            # Fallback ke ekstensi file jika MIME tidak spesifik
-            if any(file_name.endswith(ext) for ext in VID_EXTS): return 'video'
-            if any(file_name.endswith(ext) for ext in AUD_EXTS): return 'audio'
-            if any(file_name.endswith(ext) for ext in IMG_EXTS): return 'image'
-            if any(file_name.endswith(ext) for ext in DOC_EXTS): return 'document'
-            if any(file_name.endswith(ext) for ext in ARC_EXTS): return 'archive'
-            if any(file_name.endswith(ext) for ext in APP_EXTS): return 'application'
-
-    # Prioritas 2: Analisis link jika tidak ada media
-    link_lower = (link or "").lower()
-    if is_magnet(link_lower): return 'archive'  # Torrent biasanya dianggap arsip
-    if any(ext in link_lower for ext in VID_EXTS): return 'video'
-    if any(ext in link_lower for ext in AUD_EXTS): return 'audio'
-    if any(ext in link_lower for ext in IMG_EXTS): return 'image'
-    if any(ext in link_lower for ext in ARC_EXTS): return 'archive'
-    if any(ext in link_lower for ext in APP_EXTS): return 'application'
-    if any(ext in link_lower for ext in DOC_EXTS): return 'document'
-
-    # Default jika tidak ada kategori yang cocok
-    return 'others'
-
-# ===================================================================================================
-# FUNGSI INI TELAH DIMODIFIKASI UNTUK MENAMPILKAN NAMA FILE
-# ===================================================================================================
-async def run_mirror_leech_entry(client, message: Message, isQbit=False, isLeech=False):
-    """
-    Fungsi entri utama yang menentukan kategori sebelum memanggil logika mirror/leech.
-    """
-    text_args = message.text.split()
-    # Jika ada argumen manual (-s, -up, dll.), gunakan logika lama tanpa kategori otomatis.
-    if any(arg in ['-s', '-select', '-up', '-samedir', '-sd', '-m', '-id'] for arg in text_args):
-        await _mirror_leech(client, message, isQbit, isLeech)
-    else:
-        # --- Logika Otomatisasi Kategori ---
-        link = ""
-        reply_to = message.reply_to_message
-        file_display_name = ""
-
-        # Ekstrak link dari teks perintah atau dari pesan yang dibalas
-        command_parts = message.text.split(' ', 1)
-        if len(command_parts) > 1:
-            link = command_parts[1].strip()
-        elif reply_to and reply_to.text:
-            link = reply_to.text.strip().split('\n', 1)[0]
-
-        # Prioritas 1: Dapatkan nama file dari media yang dibalas (paling akurat)
-        if reply_to and reply_to.media:
-            media = getattr(reply_to, reply_to.media.value)
-            if hasattr(media, 'file_name') and media.file_name:
-                file_display_name = media.file_name
-        
-        # Prioritas 2: Jika tidak ada media, coba ekstrak nama file dari link
-        if not file_display_name and link:
-            # Menggunakan unquote untuk menangani karakter URL-encoded (misal: %20)
-            # Membersihkan dari parameter query (?...)
-            cleaned_link = link.split('?')[0]
-            if '/' in cleaned_link:
-                # Mengambil bagian terakhir dari path URL
-                file_display_name = unquote(cleaned_link.split('/')[-1])
-
-        # Pemeriksaan jika tidak ada link atau file yang valid untuk diproses
-        if not link and not (reply_to and reply_to.media):
-            await sendMessage(message, "Tidak ada link atau file yang valid untuk di-mirror.")
-            return
-
-        # Dapatkan kategori file dan path tujuan upload
-        category = get_file_category(link, reply_to)
-        up_path = CUSTOM_DESTINATIONS.get(category)
-        
-        if not up_path:
-            await sendMessage(message, "Kategori tidak dapat ditentukan atau tidak valid!")
-            return
-        
-        # Buat pesan konfirmasi, sertakan nama file jika berhasil didapatkan
-        if file_display_name:
-            # Gunakan html.escape() untuk keamanan jika nama file mengandung karakter HTML
-            confirmation_message = f"✅ Oke! File <b>({escape(file_display_name)})</b> akan di-mirror ke folder <b>{CATEGORY_DISPLAY_NAMES[category]}</b>."
-        else:
-            # Pesan fallback jika nama file tidak dapat diekstrak
-            confirmation_message = f"✅ Oke! File akan di-mirror ke folder <b>{CATEGORY_DISPLAY_NAMES[category]}</b>."
-        
-        # Kirim pesan konfirmasi dan mulai proses mirror/leech
-        await sendMessage(message, confirmation_message)
-        await _mirror_leech(client, message, isQbit=isQbit, isLeech=isLeech, custom_upload_path=up_path)
-
+async def clone(client, message):
+    await run_mirror_leech_entry(client, message)
 
 async def wzmlxcb(_, query):
     message = query.message
@@ -548,18 +568,6 @@ async def wzmlxcb(_, query):
             if message.reply_to_message.reply_to_message:
                 await deleteMessage(message.reply_to_message.reply_to_message)
 
-async def mirror(client, message):
-    await run_mirror_leech_entry(client, message)
-
-async def qb_mirror(client, message):
-    await run_mirror_leech_entry(client, message, isQbit=True)
-
-async def leech(client, message):
-    await run_mirror_leech_entry(client, message, isLeech=True)
-
-async def qb_leech(client, message):
-    await run_mirror_leech_entry(client, message, isQbit=True, isLeech=True)
-
 bot.add_handler(
     MessageHandler(
         mirror,
@@ -588,6 +596,14 @@ bot.add_handler(
     MessageHandler(
         qb_leech,
         filters=command(BotCommands.QbLeechCommand)
+        & CustomFilters.authorized
+        & ~CustomFilters.blacklisted,
+    )
+)
+bot.add_handler(
+    MessageHandler(
+        clone,
+        filters=command(BotCommands.CloneCommand)
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
